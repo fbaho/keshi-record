@@ -24,7 +24,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v3.0.1';
+      var APP_VERSION = 'v4.0.0';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -379,6 +379,12 @@
     .mem-plan-card.perm .plan-price{color:#B8860B}
     .admin-plan-btn.perm{border-color:rgba(255,179,0,.4);color:#B8860B}
     .admin-plan-btn.perm.selected{border-color:#FFB300;background:rgba(255,215,0,.12);color:#B8860B}
+    .admin-tab{text-align:center;padding:10px 8px;border-radius:10px;font-size:14px;font-weight:600;color:var(--text-3);background:var(--bg-card,#F0F0F5);cursor:pointer;transition:all .15s}
+    .admin-tab.active{background:var(--primary);color:#fff}
+    .pay-method-tab{display:flex;align-items:center;justify-content:center;gap:5px;text-align:center;padding:10px 8px;border:1.5px solid var(--border-light);border-radius:10px;font-size:13px;font-weight:600;color:var(--text-3);background:#fff;cursor:pointer;transition:all .15s}
+    .pay-method-tab svg{width:16px;height:16px}
+    .pay-method-tab.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
+    .pay-method-tab.active svg{color:var(--primary)}
     .perm-text{color:#FF9500;font-weight:600}
     .student-limit-bar.locked .bar-bg{background:rgba(255,59,48,.15)}
     .student-limit-bar.locked .bar-fill{background:var(--danger)}
@@ -435,6 +441,8 @@
     <symbol id="icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></symbol>
     <symbol id="icon-crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14M3 8l4 4 5-6 5 6 4-4-2 10H5L3 8z"/></symbol>
     <symbol id="icon-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+    <symbol id="icon-wechat" viewBox="0 0 24 24" fill="currentColor"><path d="M8.69 4C4.99 4 2 6.46 2 9.5c0 1.74.96 3.29 2.47 4.32L4 16l2.27-1.14c.74.2 1.5.3 2.28.3.18 0 .36 0 .54-.02-.12-.4-.18-.82-.18-1.26 0-2.76 2.69-5 6-5 .2 0 .39 0 .58.03C15.15 6.18 12.2 4 8.69 4zM6.5 8.5a1 1 0 110-2 1 1 0 010 2zm4.4 0a1 1 0 110-2 1 1 0 010 2z"/><path d="M22 13.88c0-2.49-2.46-4.5-5.5-4.5s-5.5 2.01-5.5 4.5 2.46 4.5 5.5 4.5c.63 0 1.23-.08 1.8-.23L20 19.5l-.43-1.5c1.5-.83 2.43-2.13 2.43-4.12zm-7.3-.5a.8.8 0 110-1.6.8.8 0 010 1.6zm3.6 0a.8.8 0 110-1.6.8.8 0 010 1.6z"/></symbol>
+    <symbol id="icon-alipay" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14a2 2 0 012 2v9.2c-1.2-.4-2.7-.9-4.3-1.5.3-.6.6-1.2.8-1.9h-3.2V9h3.9V8h-3.9V6.3h-1.5V8H9.4v1h3.4v1.8H9.3v1h3.5c-.2.5-.4 1-.7 1.4-1.2-.4-2.3-.8-3.3-1.1.4-.3.8-.7 1.1-1.3H7.1c.5-.8.9-1.7 1.2-2.7H6.7c-.4 1-.9 1.9-1.5 2.7-.6-.2-1.2-.4-1.7-.5V5a2 2 0 012-2z"/><path d="M21 16.5c-2 1.5-5 2.5-9 2.5-3.5 0-6.5-.8-9-2.2V19a2 2 0 002 2h14a2 2 0 002-2v-2.5z"/></symbol>
   </svg>
   <!-- 新版本更新提示条 -->
   <div id="update-banner">
@@ -868,6 +876,61 @@ function saveUsers(users) {
   cbSync(); // 会员/激活码变更同步到云端
 }
 
+// ===== 云函数调用封装（会员订单系统） =====
+// 管理员密码，与云函数 ADMIN_PWD、管理员面板一致
+var ADMIN_PWD_CB = 'keshi2024';
+
+// 调用 confirmMembership 云函数
+function cbCallConfirm(action, extra) {
+  if (!cbApp) cbInit();
+  if (!cbApp) return Promise.resolve({ code: 500, msg: 'CloudBase 未初始化' });
+  var data = Object.assign({ action: action, password: ADMIN_PWD_CB }, extra || {});
+  return cbApp.callFunction({ name: 'confirmMembership', data: data }).then(function(res){
+    return res && res.result;
+  }).catch(function(err){
+    console.error('cbCallConfirm error:', err);
+    return { code: 500, msg: '云函数调用失败: ' + (err.message || err) };
+  });
+}
+
+// 提交会员开通订单（用户端）
+function submitMembershipOrder(plan) {
+  var phone = getCurrentUser();
+  if (!phone) { showToast('请先登录'); return; }
+  if (!CB_UID || !cbDb) { showToast('账号未就绪，请稍后'); return; }
+  var planInfo = MEMBERSHIP_PLANS[plan];
+  if (!planInfo) return;
+  var orderDoc = {
+    orderId: 'ORD' + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase(),
+    uid: CB_UID,
+    phone: phone,
+    plan: plan,
+    planName: planInfo.name,
+    amount: planInfo.price,
+    status: 'pending',
+    createdAt: Date.now()
+  };
+  cbDb.collection('orders').add(orderDoc).then(function(res){
+    showToast('订单已提交，等待管理员确认');
+    activationMode = false;
+    pendingOrderId = res.id || res._id || '';
+    renderMembershipContent();
+  }).catch(function(err){
+    console.error('submitOrder error:', err);
+    showToast('订单提交失败: ' + (err.message || err));
+  });
+}
+
+// 查询当前用户的订单状态（用户端，PRIVATE 权限只能查到自己的）
+function queryMyOrders() {
+  if (!cbDb || !CB_UID) return Promise.resolve([]);
+  return cbDb.collection('orders').orderBy('createdAt', 'desc').limit(10).get().then(function(res){
+    return (res && res.data) || [];
+  }).catch(function(){ return []; });
+}
+
+var pendingOrderId = ''; // 最近提交的待确认订单 id
+
 function getCurrentUser() {
   return localStorage.getItem(SESSION_KEY);
 }
@@ -997,17 +1060,34 @@ function validateCode(phone, plan, code) {
 function openMembership() {
   try {
     activationMode = false;
+    paymentMode = false;
     renderMembershipContent();
     var m = document.getElementById('modal-membership');
     if (!m) { alert('错误：找不到会员中心容器'); return; }
     m.style.display = 'flex';
+    // 后台查询待确认订单
+    loadMyPendingOrders();
   } catch(e) {
     alert('打开会员中心出错：' + e.message + '\n请截图反馈');
   }
 }
 
+// 加载当前用户的待确认订单
+function loadMyPendingOrders() {
+  if (!CB_UID || !cbDb) return;
+  queryMyOrders().then(function(orders){
+    myPendingOrders = (orders || []).filter(function(o){ return o.status === 'pending'; });
+    if (myPendingOrders.length > 0 && !paymentMode && !activationMode) {
+      renderMembershipContent();
+    }
+  });
+}
+
 var selectedPlan = 'annual';
 var activationMode = false; // false=选套餐, true=输入激活码
+var paymentMode = false;    // true=展示收款码支付
+var payMethod = 'wechat';   // 'wechat' 微信 | 'alipay' 支付宝
+var myPendingOrders = [];   // 当前用户的待确认订单
 
 function renderMembershipContent() {
   var info = getMembershipInfo();
@@ -1089,8 +1169,37 @@ function renderMembershipContent() {
     html += '</div>';
   }
 
-  if (activationMode) {
-    // 激活码输入区
+  if (paymentMode) {
+    // 支付模式：展示收款码
+    var planInfo2 = MEMBERSHIP_PLANS[selectedPlan];
+    var isPermPlan = planInfo2.lifetime;
+    var masked2 = (getCurrentUser() || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    html += '<div style="margin-top:16px;background:var(--bg-input,#EFEFF4);border-radius:12px;padding:18px 16px">';
+    html += '<div style="text-align:center;margin-bottom:12px">';
+    html += '<div style="font-size:13px;color:var(--text-3);margin-bottom:4px">' + planInfo2.name + (isPermPlan ? ' · 永久' : ' · ¥' + planInfo2.price + '/' + planInfo2.unit) + '</div>';
+    html += '<div style="font-size:32px;font-weight:700;color:var(--primary)">¥' + planInfo2.price + '</div>';
+    html += '</div>';
+    // 微信/支付宝 切换
+    html += '<div style="display:flex;gap:8px;margin-bottom:14px">';
+    html += '<div class="pay-method-tab' + (payMethod==='wechat'?' active':'') + '" onclick="switchPayMethod(\'wechat\')" style="flex:1">' + svgIcon('wechat') + ' 微信</div>';
+    html += '<div class="pay-method-tab' + (payMethod==='alipay'?' active':'') + '" onclick="switchPayMethod(\'alipay\')" style="flex:1">' + svgIcon('alipay') + ' 支付宝</div>';
+    html += '</div>';
+    // 收款码图片
+    var qrSrc = payMethod === 'wechat' ? 'assets/wechat-qr.jpg' : 'assets/alipay-qr.jpg';
+    var qrName = payMethod === 'wechat' ? '微信收款码' : '支付宝收款码';
+    html += '<div style="background:#fff;border-radius:12px;padding:16px;text-align:center">';
+    html += '<img src="' + qrSrc + '" alt="' + qrName + '" style="width:200px;height:200px;object-fit:contain" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">';
+    html += '<div style="display:none;padding:60px 10px;color:var(--text-3);font-size:13px">' + qrName + '待上传<br>请联系管理员</div>';
+    html += '<div style="font-size:13px;color:var(--text-2);margin-top:10px">长按或扫码支付 ¥' + planInfo2.price + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:14px">';
+    html += '<button class="btn" style="flex:1;background:var(--bg-input,#EFEFF4);color:var(--text-2)" onclick="cancelPurchase()">返回</button>';
+    html += '<button class="btn btn-primary" style="flex:2" onclick="confirmPaid()">我已支付</button>';
+    html += '</div>';
+    html += '<div style="text-align:center;margin-top:12px"><a style="font-size:13px;color:var(--primary)" onclick="useActivationCode()">使用激活码开通</a></div>';
+    html += '</div>';
+  } else if (activationMode) {
+    // 激活码输入区（保留作为备选）
     var planInfo2 = MEMBERSHIP_PLANS[selectedPlan];
     var isPermPlan = planInfo2.lifetime;
     html += '<div style="margin-top:16px;background:var(--bg-input,#EFEFF4);border-radius:12px;padding:16px">';
@@ -1102,6 +1211,16 @@ function renderMembershipContent() {
     html += '<button class="btn btn-primary" style="flex:2" onclick="confirmActivation()">激活会员</button>';
     html += '</div>';
     html += '</div>';
+  } else if (myPendingOrders.length > 0) {
+    // 有待确认订单
+    var o0 = myPendingOrders[0];
+    var oPlan = MEMBERSHIP_PLANS[o0.plan] || { name: o0.planName, price: o0.amount };
+    var oDt = new Date(o0.createdAt || Date.now());
+    var oTime = (oDt.getMonth()+1) + '/' + oDt.getDate() + ' ' + oDt.getHours() + ':' + String(oDt.getMinutes()).padStart(2,'0');
+    html += '<div style="margin-top:16px;background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.3);border-radius:12px;padding:16px;text-align:center">';
+    html += '<div style="font-size:15px;font-weight:600;color:#FF9500;margin-bottom:8px">' + svgIcon('clock') + ' 订单待确认</div>';
+    html += '<div style="font-size:13px;color:var(--text-2);line-height:1.6">' + oPlan.name + ' · ¥' + o0.amount + '<br>下单时间：' + oTime + '<br>管理员确认后自动开通</div>';
+    html += '</div>';
   } else if (!isPermanent) {
     // 购买按钮（永久会员不显示）
     var btnText = info.status === 'active' ? '续费 ' + MEMBERSHIP_PLANS[selectedPlan].price + ' 元' : '开通会员 ' + MEMBERSHIP_PLANS[selectedPlan].price + ' 元';
@@ -1109,7 +1228,9 @@ function renderMembershipContent() {
   }
 
   // 底部说明
-  if (activationMode) {
+  if (paymentMode) {
+    html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">扫码支付后点击"我已支付"<br>管理员确认后会员立即开通</div>';
+  } else if (activationMode) {
     html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">' + svgIcon('lock') + ' 激活码请联系管理员获取<br>每个激活码仅对当前手机号有效</div>';
   } else {
     html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">会员绑定当前手机号 ' + (getCurrentUser() || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') + '<br>开通后立即生效，到期自动恢复为非会员</div>';
@@ -1120,11 +1241,37 @@ function renderMembershipContent() {
 
 function selectPlan(plan) {
   selectedPlan = plan;
+  if (paymentMode) {} // 选套餐时不退出支付模式
   renderMembershipContent();
 }
 
 function handlePurchaseMembership() {
-  // 进入激活码输入模式
+  // 进入扫码支付模式
+  paymentMode = true;
+  activationMode = false;
+  renderMembershipContent();
+}
+
+// 切换微信/支付宝
+function switchPayMethod(method) {
+  payMethod = method;
+  renderMembershipContent();
+}
+
+// 用户点"我已支付"，提交订单
+function confirmPaid() {
+  submitMembershipOrder(selectedPlan);
+}
+
+// 返回选套餐
+function cancelPurchase() {
+  paymentMode = false;
+  renderMembershipContent();
+}
+
+// 切换到激活码方式
+function useActivationCode() {
+  paymentMode = false;
   activationMode = true;
   renderMembershipContent();
   setTimeout(function(){
@@ -1162,10 +1309,13 @@ function cancelActivation() {
   renderMembershipContent();
 }
 
-// ===== 管理员面板（激活码生成） =====
+// ===== 管理员面板（激活码生成 + 订单管理） =====
 var ADMIN_PWD = 'keshi2024';
 var adminUnlocked = false;
 var adminSelectedPlan = 'annual';
+var adminTab = 'orders'; // 'orders' = 订单管理, 'code' = 激活码
+var adminOrders = [];     // 订单列表缓存
+var adminOrdersLoading = false;
 
 function openAdminPanel() {
   renderAdminContent();
@@ -1192,20 +1342,138 @@ function renderAdminContent() {
     setTimeout(function(){ var i=document.getElementById('admin-pwd'); if(i) i.focus(); },100);
     return;
   }
-  el.innerHTML = '<div style="padding:8px 0">' +
-    '<div style="font-size:15px;font-weight:600;margin-bottom:14px">生成激活码</div>' +
-    '<div style="font-size:13px;color:var(--text-2);margin-bottom:6px">用户手机号</div>' +
-    '<input id="admin-phone" type="tel" maxlength="11" placeholder="11位手机号" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:#fff" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')">' +
-    '<div style="font-size:13px;color:var(--text-2);margin:14px 0 6px">套餐类型</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-    '<div class="admin-plan-btn" id="admin-plan-monthly" onclick="adminSelectPlan(\'monthly\')" style="flex:1">月卡 ¥15</div>' +
-    '<div class="admin-plan-btn" id="admin-plan-annual" onclick="adminSelectPlan(\'annual\')" style="flex:1">年卡 ¥150</div>' +
+  // tab 切换栏
+  var pendingCount = adminOrders.filter(function(o){ return o.status === 'pending'; }).length;
+  var html = '<div style="padding:8px 0">';
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html += '<div class="admin-tab' + (adminTab==='orders'?' active':'') + '" onclick="adminSwitchTab(\'orders\')" style="flex:1">订单管理' + (pendingCount>0?(' ('+pendingCount+')'):'') + '</div>';
+  html += '<div class="admin-tab' + (adminTab==='code'?' active':'') + '" onclick="adminSwitchTab(\'code\')" style="flex:1">激活码</div>';
+  html += '</div>';
+  if (adminTab === 'orders') {
+    html += '<div id="admin-orders-area"><div style="text-align:center;color:var(--text-3);padding:20px;font-size:13px">加载中...</div></div>';
+  } else {
+    html += '<div style="font-size:15px;font-weight:600;margin-bottom:14px">生成激活码</div>' +
+      '<div style="font-size:13px;color:var(--text-2);margin-bottom:6px">用户手机号</div>' +
+      '<input id="admin-phone" type="tel" maxlength="11" placeholder="11位手机号" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:#fff" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')">' +
+      '<div style="font-size:13px;color:var(--text-2);margin:14px 0 6px">套餐类型</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+      '<div class="admin-plan-btn" id="admin-plan-monthly" onclick="adminSelectPlan(\'monthly\')" style="flex:1">月卡 ¥15</div>' +
+      '<div class="admin-plan-btn" id="admin-plan-annual" onclick="adminSelectPlan(\'annual\')" style="flex:1">年卡 ¥150</div>' +
+      '</div>' +
+      '<div class="admin-plan-btn perm" id="admin-plan-lifetime" onclick="adminSelectPlan(\'lifetime\')" style="width:100%;box-sizing:border-box">永久 ¥1588</div>' +
+      '<button class="btn btn-primary" style="margin-top:16px;width:100%" onclick="adminGenerate()">生成激活码</button>' +
+      '<div id="admin-result" style="margin-top:16px"></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  if (adminTab === 'orders') {
+    adminLoadOrders();
+  } else {
+    adminSelectPlan(adminSelectedPlan);
+  }
+}
+
+// 切换 tab
+function adminSwitchTab(tab) {
+  adminTab = tab;
+  renderAdminContent();
+}
+
+// 加载订单列表（调云函数）
+function adminLoadOrders() {
+  if (adminOrdersLoading) return;
+  adminOrdersLoading = true;
+  var area = document.getElementById('admin-orders-area');
+  if (area) area.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px;font-size:13px">加载中...</div>';
+  cbCallConfirm('listAll', {}).then(function(res){
+    adminOrdersLoading = false;
+    if (res && res.code === 0) {
+      adminOrders = res.data || [];
+    } else {
+      adminOrders = [];
+      console.error('adminLoadOrders failed:', res);
+    }
+    adminRenderOrders();
+  });
+}
+
+// 渲染订单列表
+function adminRenderOrders() {
+  var area = document.getElementById('admin-orders-area');
+  if (!area) return;
+  if (!adminOrders || adminOrders.length === 0) {
+    area.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:30px 10px;font-size:13px">' + svgIcon('check') + '<div style="margin-top:8px">暂无订单</div></div>';
+    return;
+  }
+  var pending = adminOrders.filter(function(o){ return o.status === 'pending'; });
+  var others = adminOrders.filter(function(o){ return o.status !== 'pending'; });
+  var html = '';
+  if (pending.length > 0) {
+    html += '<div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:8px">待确认 (' + pending.length + ')</div>';
+    pending.forEach(function(o){ html += adminOrderCardHtml(o, true); });
+  }
+  if (others.length > 0) {
+    html += '<div style="font-size:13px;font-weight:600;color:var(--text-3);margin:16px 0 8px">历史记录</div>';
+    others.slice(0, 20).forEach(function(o){ html += adminOrderCardHtml(o, false); });
+  }
+  area.innerHTML = html;
+}
+
+function adminOrderCardHtml(o, isPending) {
+  var planInfo = MEMBERSHIP_PLANS[o.plan] || { name: o.planName || o.plan, price: o.amount };
+  var masked = o.phone ? (o.phone.slice(0,3) + '****' + o.phone.slice(-4)) : '未知';
+  var dt = new Date(o.createdAt || Date.now());
+  var timeStr = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + dt.getHours() + ':' + String(dt.getMinutes()).padStart(2,'0');
+  var statusTag = '';
+  if (o.status === 'confirmed') statusTag = '<span style="color:#34C759;font-size:12px">已开通</span>';
+  else if (o.status === 'rejected') statusTag = '<span style="color:var(--text-3);font-size:12px">已拒绝</span>';
+  var btns = '';
+  if (isPending) {
+    btns = '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<button class="btn" style="flex:1;background:var(--bg-input,#EFEFF4);color:var(--text-2);padding:9px" onclick="adminRejectOrder(\'' + o._id + '\')">拒绝</button>' +
+      '<button class="btn btn-primary" style="flex:2;padding:9px" onclick="adminConfirmOrder(\'' + o._id + '\')">确认开通</button>' +
+      '</div>';
+  }
+  return '<div style="background:var(--bg-card,#F7F7FA);border-radius:12px;padding:14px;margin-bottom:10px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<div style="font-size:15px;font-weight:600;color:var(--text-1)">' + planInfo.name + ' ¥' + o.amount + '</div>' +
+      statusTag +
     '</div>' +
-    '<div class="admin-plan-btn perm" id="admin-plan-lifetime" onclick="adminSelectPlan(\'lifetime\')" style="width:100%;box-sizing:border-box">永久 ¥1588</div>' +
-    '<button class="btn btn-primary" style="margin-top:16px;width:100%" onclick="adminGenerate()">生成激活码</button>' +
-    '<div id="admin-result" style="margin-top:16px"></div>' +
+    '<div style="font-size:12px;color:var(--text-3);line-height:1.6">' +
+      '<div>手机号：' + masked + '</div>' +
+      '<div>下单时间：' + timeStr + '</div>' +
+      '<div>订单号：' + (o.orderId || o._id || '') + '</div>' +
+    '</div>' +
+    btns +
     '</div>';
-  adminSelectPlan(adminSelectedPlan);
+}
+
+// 确认开通订单
+function adminConfirmOrder(orderId) {
+  showConfirm('确认开通该订单？开通后该用户立即成为会员。', function(){
+    cbCallConfirm('confirm', { orderId: orderId }).then(function(res){
+      if (res && res.code === 0) {
+        showToast('已开通');
+        adminLoadOrders();
+      } else {
+        showToast('开通失败：' + (res && res.msg ? res.msg : '未知错误'));
+      }
+    });
+  });
+}
+
+// 拒绝订单
+function adminRejectOrder(orderId) {
+  showConfirm('确定拒绝该订单？', function(){
+    cbCallConfirm('reject', { orderId: orderId }).then(function(res){
+      if (res && res.code === 0) {
+        showToast('已拒绝');
+        adminLoadOrders();
+      } else {
+        showToast('操作失败：' + (res && res.msg ? res.msg : '未知错误'));
+      }
+    });
+  });
 }
 
 function adminSelectPlan(plan) {

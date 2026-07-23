@@ -1,6 +1,6 @@
 // Service Worker - 课时记录 PWA
 // 每次部署新版本时，修改下方 VERSION 即可触发更新
-const VERSION = 'v3.0.1';
+const VERSION = 'v4.0.0';
 const CACHE_NAME = 'keshi-app-' + VERSION;
 
 // 需要预缓存的静态资源（版本不变则走缓存，版本升级则重新下载）
@@ -15,7 +15,9 @@ const PRE_CACHE = [
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-256.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './assets/wechat-qr.jpg',
+  './assets/alipay-qr.jpg'
 ];
 
 // 安装：预缓存静态资源
