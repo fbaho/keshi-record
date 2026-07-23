@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.2';
+      var APP_VERSION = 'v4.0.3';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -763,13 +763,13 @@
   </div>
 </div>
 
-<!-- 管理员面板（激活码生成） -->
-<div id="admin-panel" class="modal-mask" style="display:none">
-  <div class="modal" style="max-width:430px;border-radius:16px;padding:24px 20px;max-height:90vh;overflow-y:auto">
-    <div class="modal-close" onclick="closeAdminPanel()">×</div>
-    <div class="modal-title">激活码管理</div>
-    <div id="admin-content"></div>
+<!-- 管理员面板（全屏页面） -->
+<div id="admin-panel" style="display:none;position:fixed;inset:0;z-index:2000;background:var(--bg-page,#F2F2F7);overflow:auto">
+  <div style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:17px;font-weight:600">管理后台</div>
+    <button onclick="closeAdminPanel()" style="background:transparent;border:none;color:var(--primary);font-size:15px;cursor:pointer;padding:6px 10px">返回</button>
   </div>
+  <div style="max-width:680px;margin:0 auto;padding:16px" id="admin-content"></div>
 </div>
 
 <script>
@@ -1334,11 +1334,13 @@ var adminOrdersLoading = false;
 
 function openAdminPanel() {
   renderAdminContent();
-  document.getElementById('admin-panel').style.display = 'flex';
+  document.getElementById('admin-panel').style.display = 'block';
+  document.body.style.overflow = 'hidden';
 }
 
 function closeAdminPanel() {
   document.getElementById('admin-panel').style.display = 'none';
+  document.body.style.overflow = '';
   if (location.hash === '#admin') {
     history.replaceState(null, '', location.pathname + location.search);
   }
@@ -1348,9 +1350,10 @@ function renderAdminContent() {
   var el = document.getElementById('admin-content');
   if (!el) return;
   if (!adminUnlocked) {
-    el.innerHTML = '<div style="padding:20px 0;text-align:center">' +
-      '<div style="margin-bottom:16px">' + svgIcon('lock','ico-xl') + '</div>' +
-      '<div style="font-size:14px;color:var(--text-2);margin-bottom:10px">请输入管理员密码</div>' +
+    el.innerHTML = '<div style="padding:60px 0;text-align:center;max-width:360px;margin:0 auto">' +
+      '<div style="margin-bottom:20px">' + svgIcon('lock','ico-xl') + '</div>' +
+      '<div style="font-size:16px;font-weight:600;margin-bottom:8px">管理后台</div>' +
+      '<div style="font-size:14px;color:var(--text-2);margin-bottom:16px">请输入管理员密码</div>' +
       '<input id="admin-pwd" type="password" placeholder="密码" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:#fff;text-align:center" onkeydown="if(event.key===\'Enter\')checkAdminPwd()">' +
       '<button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="checkAdminPwd()">进入</button>' +
       '</div>';
@@ -1360,9 +1363,9 @@ function renderAdminContent() {
   // tab 切换栏
   var pendingCount = adminOrders.filter(function(o){ return o.status === 'pending'; }).length;
   var html = '<div style="padding:8px 0">';
-  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
-  html += '<div class="admin-tab' + (adminTab==='orders'?' active':'') + '" onclick="adminSwitchTab(\'orders\')" style="flex:1">订单管理' + (pendingCount>0?(' ('+pendingCount+')'):'') + '</div>';
-  html += '<div class="admin-tab' + (adminTab==='code'?' active':'') + '" onclick="adminSwitchTab(\'code\')" style="flex:1">激活码</div>';
+  html += '<div style="display:flex;gap:12px;margin-bottom:20px">';
+  html += '<div class="admin-tab' + (adminTab==='orders'?' active':'') + '" onclick="adminSwitchTab(\'orders\')" style="flex:1;padding:12px;font-size:15px">订单管理' + (pendingCount>0?(' ('+pendingCount+')'):'') + '</div>';
+  html += '<div class="admin-tab' + (adminTab==='code'?' active':'') + '" onclick="adminSwitchTab(\'code\')" style="flex:1;padding:12px;font-size:15px">激活码</div>';
   html += '</div>';
   if (adminTab === 'orders') {
     html += '<div id="admin-orders-area"><div style="text-align:center;color:var(--text-3);padding:20px;font-size:13px">加载中...</div></div>';
