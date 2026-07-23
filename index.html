@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.3';
+      var APP_VERSION = 'v4.0.4';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1474,35 +1474,31 @@ function adminOrderCardHtml(o, isPending) {
 
 // 确认开通订单
 function adminConfirmOrder(orderId) {
-  showConfirm('确认开通该订单？开通后该用户立即成为会员。', function(){
-    cbCallConfirm('confirm', { orderId: orderId }).then(function(res){
-      if (res && res.code === 0) {
-        showToast('已开通');
-        adminLoadOrders();
-      } else {
-        showToast('开通失败：' + (res && res.msg ? res.msg : '未知错误'));
-      }
-    }).catch(function(err){
-      console.error('adminConfirmOrder exception:', err);
-      showToast('开通异常：' + (err.message || err));
-    });
+  cbCallConfirm('confirm', { orderId: orderId }).then(function(res){
+    if (res && res.code === 0) {
+      showToast('已开通');
+      adminLoadOrders();
+    } else {
+      showToast('开通失败：' + (res && res.msg ? res.msg : '未知错误'));
+    }
+  }).catch(function(err){
+    console.error('adminConfirmOrder exception:', err);
+    showToast('开通异常：' + (err.message || err));
   });
 }
 
 // 拒绝订单
 function adminRejectOrder(orderId) {
-  showConfirm('确定拒绝该订单？', function(){
-    cbCallConfirm('reject', { orderId: orderId }).then(function(res){
-      if (res && res.code === 0) {
-        showToast('已拒绝');
-        adminLoadOrders();
-      } else {
-        showToast('操作失败：' + (res && res.msg ? res.msg : '未知错误'));
-      }
-    }).catch(function(err){
-      console.error('adminRejectOrder exception:', err);
-      showToast('操作异常：' + (err.message || err));
-    });
+  cbCallConfirm('reject', { orderId: orderId }).then(function(res){
+    if (res && res.code === 0) {
+      showToast('已拒绝');
+      adminLoadOrders();
+    } else {
+      showToast('操作失败：' + (res && res.msg ? res.msg : '未知错误'));
+    }
+  }).catch(function(err){
+    console.error('adminRejectOrder exception:', err);
+    showToast('操作异常：' + (err.message || err));
   });
 }
 
