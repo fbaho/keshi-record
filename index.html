@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.5';
+      var APP_VERSION = 'v4.0.6';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1672,6 +1672,8 @@ function handleAuth() {
     if (pwd.length < 8) { showAuthError('密码至少8位，含字母和数字'); btn.disabled=false; btn.textContent=origText; return; }
     if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(pwd)) { showAuthError('密码需同时包含字母和数字'); btn.disabled=false; btn.textContent=origText; return; }
     if (pwd !== pwd2) { showAuthError('两次密码不一致'); btn.disabled=false; btn.textContent=origText; return; }
+    // 先清除旧登录态，防止 CloudBase 缓存上一个用户的 auth state
+    try { cbAuth.signOut(); } catch(e) {}
     cbAuth.signUpWithPhoneCode(phone, code, pwd).then(function(){
       return afterAuthSuccess(phone, true);
     }).catch(function(err){
@@ -1680,6 +1682,8 @@ function handleAuth() {
     });
   } else {
     if (pwd.length < 8) { showAuthError('请输入密码'); btn.disabled=false; btn.textContent=origText; return; }
+    // 先清除旧登录态，防止 CloudBase 缓存上一个用户的 auth state
+    try { cbAuth.signOut(); } catch(e) {}
     cbAuth.signInWithPhoneCodeOrPassword({ phoneNumber: phone, password: pwd }).then(function(){
       return afterAuthSuccess(phone, false);
     }).catch(function(err){
@@ -1692,9 +1696,18 @@ function handleAuth() {
 // 登录/注册成功后的数据同步
 function afterAuthSuccess(phone, isRegister) {
   setSession(phone);
-  var cbUser = cbCheckLogin();
-  CB_UID = cbUser ? cbUser.uid : null;
-  return cbPullData(CB_UID).then(function(cloudDoc){
+  // 延迟 300ms 等 CloudBase auth state 切换完毕（signOut+signUp 后 hasLoginState 可能返回旧状态）
+  return new Promise(function(resolve){
+    setTimeout(resolve, 300);
+  }).then(function(){
+    var cbUser = cbCheckLogin();
+    CB_UID = cbUser ? cbUser.uid : null;
+    // 存储 uid-phone 映射，init 时校验防止串号
+    if (CB_UID) {
+      try { localStorage.setItem('__keshi_uid_' + phone, CB_UID); } catch(e) {}
+    }
+    return cbPullData(CB_UID);
+  }).then(function(cloudDoc){
     if (cloudDoc && cloudDoc.data) {
       // 云端有数据 → 覆盖本地（多机同步）
       try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(cloudDoc.data)); } catch(e) {}
@@ -1789,6 +1802,11 @@ function migrateLegacyData(phone) {
 
 function handleLogout() {
   showConfirm('确定退出登录吗？数据不会丢失，下次登录可继续使用。', function() {
+    // 清除当前用户的 uid 映射
+    var currentPhone = getCurrentUser();
+    if (currentPhone) {
+      try { localStorage.removeItem('__keshi_uid_' + currentPhone); } catch(e) {}
+    }
     clearSession();
     CB_UID = null;
     if (cbAuth) { try { cbAuth.signOut(); } catch(e) {} }
@@ -3970,18 +3988,29 @@ function parseExcelToData(wb) {
   var cbUser = cbCheckLogin();
   var localPhone = getCurrentUser();
   if (cbUser && localPhone) {
-    CB_UID = cbUser.uid;
-    // 后台从云端拉取最新数据（多机同步）
-    cbPullData(CB_UID).then(function(cloudDoc){
-      if (cloudDoc && cloudDoc.data) {
-        try { localStorage.setItem('keshi_data_' + localPhone, JSON.stringify(cloudDoc.data)); } catch(e) {}
-        syncCloudMetaToLocal(localPhone, cloudDoc);
-        if (typeof renderHome === 'function') renderHome();
-        if (typeof renderStudents === 'function') renderStudents();
-        if (typeof updateMemberBadge === 'function') updateMemberBadge();
-      }
-    });
-    enterApp();
+    // 校验 CloudBase uid 与本地存储的 uid 是否匹配（防止串号）
+    var storedUid = null;
+    try { storedUid = localStorage.getItem('__keshi_uid_' + localPhone); } catch(e) {}
+    if (storedUid && storedUid !== cbUser.uid) {
+      // 串号！CloudBase 返回的 uid 与本地记录的不一致 → 强制重新登录
+      console.error('UID mismatch! stored=' + storedUid + ' cbUser=' + cbUser.uid + ' phone=' + localPhone);
+      clearSession();
+      try { cbAuth.signOut(); } catch(e) {}
+      showAuthPage();
+    } else {
+      CB_UID = cbUser.uid;
+      // 后台从云端拉取最新数据（多机同步）
+      cbPullData(CB_UID).then(function(cloudDoc){
+        if (cloudDoc && cloudDoc.data) {
+          try { localStorage.setItem('keshi_data_' + localPhone, JSON.stringify(cloudDoc.data)); } catch(e) {}
+          syncCloudMetaToLocal(localPhone, cloudDoc);
+          if (typeof renderHome === 'function') renderHome();
+          if (typeof renderStudents === 'function') renderStudents();
+          if (typeof updateMemberBadge === 'function') updateMemberBadge();
+        }
+      });
+      enterApp();
+    }
   } else {
     if (localPhone || cbUser) clearSession();
     showAuthPage();
