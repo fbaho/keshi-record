@@ -24,7 +24,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.0';
+      var APP_VERSION = 'v4.0.1';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -884,6 +884,11 @@ var ADMIN_PWD_CB = 'keshi2024';
 function cbCallConfirm(action, extra) {
   if (!cbApp) cbInit();
   if (!cbApp) return Promise.resolve({ code: 500, msg: 'CloudBase 未初始化' });
+  // 管理员面板调用云函数需要登录态，未登录时提示先登录
+  if (!cbCheckLogin()) {
+    showToast('请先在 App 内登录手机号，再使用管理功能');
+    return Promise.resolve({ code: 403, msg: '请先登录' });
+  }
   var data = Object.assign({ action: action, password: ADMIN_PWD_CB }, extra || {});
   return cbApp.callFunction({ name: 'confirmMembership', data: data }).then(function(res){
     return res && res.result;
@@ -3918,6 +3923,11 @@ function parseExcelToData(wb) {
     if (authPage) authPage.style.display = 'none';
     var appPage = document.getElementById('app');
     if (appPage) appPage.style.display = 'none';
+    // 恢复 CloudBase 登录态（管理员面板调云函数需要认证）
+    var cbAdminUser = cbCheckLogin();
+    if (cbAdminUser) {
+      CB_UID = cbAdminUser.uid;
+    }
     openAdminPanel();
     return;
   }
