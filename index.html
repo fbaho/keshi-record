@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.4';
+      var APP_VERSION = 'v4.0.5';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1082,6 +1082,8 @@ function openMembership() {
     m.style.display = 'flex';
     // 后台查询待确认订单
     loadMyPendingOrders();
+    // 后台从云端拉取最新会员状态（管理员可能刚确认了订单）
+    refreshMembershipFromCloud();
   } catch(e) {
     alert('打开会员中心出错：' + e.message + '\n请截图反馈');
   }
@@ -1093,6 +1095,18 @@ function loadMyPendingOrders() {
   queryMyOrders().then(function(orders){
     myPendingOrders = (orders || []).filter(function(o){ return o.status === 'pending'; });
     if (myPendingOrders.length > 0 && !paymentMode && !activationMode) {
+      renderMembershipContent();
+    }
+  });
+}
+
+// 从云端拉取最新会员状态（管理员确认后用户端自动刷新）
+function refreshMembershipFromCloud() {
+  if (!CB_UID || !cbUsermeta) return;
+  cbPullData(CB_UID).then(function(cloudDoc){
+    if (cloudDoc && cloudDoc.membership) {
+      syncCloudMetaToLocal(getCurrentUser(), cloudDoc);
+      updateMemberBadge();
       renderMembershipContent();
     }
   });
@@ -1209,7 +1223,7 @@ function renderMembershipContent() {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;margin-top:14px">';
     html += '<button class="btn" style="flex:1;background:var(--bg-input,#EFEFF4);color:var(--text-2)" onclick="cancelPurchase()">返回</button>';
-    html += '<button class="btn btn-primary" style="flex:2" onclick="confirmPaid()">我已支付</button>';
+    html += '<button class="btn btn-primary" style="flex:2" onclick="confirmPaid()">确认已扫码付款</button>';
     html += '</div>';
     html += '<div style="text-align:center;margin-top:12px"><a style="font-size:13px;color:var(--primary)" onclick="useActivationCode()">使用激活码开通</a></div>';
     html += '</div>';
@@ -1244,7 +1258,7 @@ function renderMembershipContent() {
 
   // 底部说明
   if (paymentMode) {
-    html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">扫码支付后点击"我已支付"<br>管理员确认后会员立即开通</div>';
+    html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">请先扫码付款，再点击"确认已扫码付款"<br>管理员确认后会员立即开通</div>';
   } else if (activationMode) {
     html += '<div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6;text-align:center">' + svgIcon('lock') + ' 激活码请联系管理员获取<br>每个激活码仅对当前手机号有效</div>';
   } else {
