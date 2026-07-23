@@ -24,7 +24,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v2.4.0';
+      var APP_VERSION = 'v2.5.0';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -305,6 +305,16 @@
     .auto-deduct-item .ai-dates{font-size:13px;color:var(--text-2);line-height:1.8}
     .auto-deduct-item .ai-summary{font-size:13px;color:var(--primary);font-weight:600;margin-top:4px}
     .auto-deduct-item .ai-dates .date-chip{display:inline-block;background:var(--bg-card);border:0.5px solid var(--border-light);border-radius:6px;padding:2px 8px;margin:2px 2px 0 0;font-size:12px;color:var(--text-2)}
+    .auto-chip{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:5px;background:var(--bg-card);border:1.5px solid var(--primary);border-radius:8px;padding:4px 9px;margin:2px 2px 0 0;font-size:12px;color:var(--text-2);transition:all .15s}
+    .auto-chip .ac-box{width:15px;height:15px;border-radius:4px;background:var(--primary);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+    .auto-chip:not(.selected){opacity:.5;border-color:var(--border);text-decoration:line-through}
+    .auto-chip:not(.selected) .ac-box{background:transparent;border:1px solid var(--border);color:transparent}
+    .batch-check{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-right:6px;transition:all .15s}
+    .batch-check.on{background:var(--danger);border-color:var(--danger)}
+    .batch-check.on::after{content:"✓";color:#fff;font-size:13px;font-weight:700;line-height:1}
+    .batch-toolbar{display:flex;align-items:center;gap:14px;font-size:13px;margin-left:auto}
+    .batch-toolbar .bt-btn{cursor:pointer;color:var(--primary);font-weight:500}
+    .batch-toolbar .bt-btn.danger{color:var(--danger)}
     .auth-logo svg{width:40px;height:40px;color:#fff}
     .auth-title{text-align:center;font-size:22px;font-weight:700;color:var(--text-1);margin-bottom:4px}
     .auth-subtitle{text-align:center;font-size:14px;color:var(--text-3);margin-bottom:28px}
@@ -696,7 +706,7 @@
   <div class="modal">
     <div class="modal-close" onclick="closeModal('modal-auto-deduct')">×</div>
     <div class="modal-title">排课自动消课提醒</div>
-    <div style="font-size:14px;color:var(--text-2);margin-bottom:16px;line-height:1.6">以下学员有排课日到了但尚未消课的记录，是否自动补录？</div>
+    <div style="font-size:14px;color:var(--text-2);margin-bottom:16px;line-height:1.6">以下学员有排课日到了但尚未消课的记录，是否自动补录？<br><span style="font-size:13px;color:var(--text-3)">提示：点日期可取消勾选<span style="color:var(--danger)">请假</span>的日子，只消已上的课</span></div>
     <div id="auto-deduct-list" style="max-height:50vh;overflow-y:auto"></div>
     <div id="auto-deduct-footer" style="display:flex;gap:12px;margin-top:16px">
       <button class="btn btn-outline" style="flex:1" onclick="skipAutoDeduct()">跳过</button>
@@ -1466,7 +1476,8 @@ function showAutoDeductModal() {
       const dt = new Date(d + 'T00:00:00');
       const jsDay = dt.getDay();
       const weekday = jsDay === 0 ? 7 : jsDay;
-      return '<span class="date-chip">' + (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + dayNames[weekday] + '</span>';
+      return '<span class="auto-chip selected" data-item="'+idx+'" data-date="'+d+'" onclick="toggleAutoChip(this,'+idx+')">' +
+        '<span class="ac-box">✓</span><span>' + (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + dayNames[weekday] + '</span></span>';
     }).join('');
     let skipNote = '';
     if (item.skippedDates > 0) {
@@ -1475,22 +1486,48 @@ function showAutoDeductModal() {
     return '<div class="auto-deduct-item">' +
       '<div class="ai-header"><div class="avatar">' + avatar(s.name) + '</div><div class="name">' + s.name + '</div><div style="margin-left:auto;font-size:12px;color:var(--text-3)">剩' + s.remainingHours + '课时</div></div>' +
       '<div class="ai-dates">' + dateChips + '</div>' +
-      '<div class="ai-summary">共 ' + dates.length + ' 节 × ' + item.hoursPerSession + ' 课时 = ' + totalHours + ' 课时' + skipNote + '</div>' +
+      '<div class="ai-summary" id="ai-sum-'+idx+'">共 ' + dates.length + ' 节 × ' + item.hoursPerSession + ' 课时 = ' + totalHours + ' 课时' + skipNote + '</div>' +
       '</div>';
   }).join('');
 
   openModal('modal-auto-deduct');
 }
 
+function toggleAutoChip(el, idx) {
+  el.classList.toggle('selected');
+  updateAutoSummary(idx);
+}
+
+function updateAutoSummary(idx) {
+  const item = pendingAutoDeductions[idx];
+  if (!item) return;
+  const selected = document.querySelectorAll('.auto-chip[data-item="'+idx+'"].selected').length;
+  const hours = selected * item.hoursPerSession;
+  const sumEl = document.getElementById('ai-sum-'+idx);
+  if (!sumEl) return;
+  let skipNote = '';
+  if (item.skippedDates > 0) {
+    skipNote = '<div style="font-size:12px;color:var(--warning);margin-top:4px">⚠ 剩余课时不足，跳过了 ' + item.skippedDates + ' 节</div>';
+  }
+  let tail = selected === 0 ? '<div style="font-size:12px;color:var(--text-3);margin-top:4px">已全部取消，将跳过该学员</div>' : '';
+  sumEl.innerHTML = '共 ' + selected + ' 节 × ' + item.hoursPerSession + ' 课时 = ' + hours + ' 课时' + tail + skipNote;
+}
+
 function confirmAutoDeduct() {
   const data = loadDB();
   let totalRecords = 0;
   let totalHours = 0;
+  const today = new Date().toISOString().slice(0,10);
 
-  pendingAutoDeductions.forEach(item => {
+  pendingAutoDeductions.forEach((item, idx) => {
     const s = data.students.find(st => st.id === item.student.id);
     if (!s) return;
-    item.dates.forEach(date => {
+    // 读取勾选状态
+    const selectedDates = [];
+    document.querySelectorAll('.auto-chip[data-item="'+idx+'"].selected').forEach(c => {
+      selectedDates.push(c.dataset.date);
+    });
+    selectedDates.forEach(date => {
       if (s.remainingHours < item.hoursPerSession) return;
       const calc = calcConsumeAmount(s, item.hoursPerSession);
       const record = {
@@ -1507,14 +1544,19 @@ function confirmAutoDeduct() {
       totalRecords++;
       totalHours += item.hoursPerSession;
     });
-    s.lastAutoCheckDate = new Date().toISOString().slice(0,10);
+    // 无论是否勾选，都更新 lastAutoCheckDate，避免重复提醒已处理过的日期
+    s.lastAutoCheckDate = today;
   });
 
   saveDB(data);
   closeModal('modal-auto-deduct');
   pendingAutoDeductions = [];
   renderHome(); renderStudents();
-  showToast('自动消课 ' + totalRecords + ' 条，共 ' + totalHours + ' 课时');
+  if (totalRecords > 0) {
+    showToast('自动消课 ' + totalRecords + ' 条，共 ' + totalHours + ' 课时');
+  } else {
+    showToast('已全部取消，未消课');
+  }
 }
 
 function skipAutoDeduct() {
@@ -2125,7 +2167,17 @@ function openDetail(studentId) {
   // 消课记录 + 金额调整记录
   const consumeRecords = records.filter(r => r.type !== 'adjust');
   const adjustRecords = records.filter(r => r.type === 'adjust');
-  html += '<div class="card"><div class="card-title"><span>消课记录（'+consumeRecords.length+'条）</span></div>';
+  const inBatch = detailBatchMode && detailBatchStudentId === s.id;
+  html += '<div class="card"><div class="card-title" style="display:flex;align-items:center"><span>消课记录（'+consumeRecords.length+'条）</span>';
+  if (consumeRecords.length > 0) {
+    if (!inBatch) {
+      html += '<span class="batch-toolbar"><span class="bt-btn danger" onclick="enterBatchDelete()">批量删除</span></span>';
+    } else {
+      const selCnt = detailBatchSelected.size;
+      html += '<span class="batch-toolbar"><span class="bt-btn" onclick="batchSelectAll()">'+(selCnt>=consumeRecords.length?'取消全选':'全选')+'</span><span class="bt-btn danger" onclick="batchDeleteSelected()">删除选中'+(selCnt>0?'('+selCnt+')':'')+'</span><span class="bt-btn" onclick="exitBatchDelete()">退出</span></span>';
+    }
+  }
+  html += '</div>';
   if (consumeRecords.length === 0) html += '<div class="empty-state" style="padding:30px"><div class="text">暂无消课记录</div></div>';
   else {
     let sessionCounter = 0;
@@ -2135,7 +2187,11 @@ function openDetail(studentId) {
       sessionCounter += r.hours;
       let sessionLabel = startSession === endSession ? '第'+startSession+'节' : '第'+startSession+'-'+endSession+'节';
       const giftTag = r.isGifted ? giftBadgeHtml() : '';
-      return '<div class="record-item"><div class="info"><div class="name">'+fmtDateFull(r.date)+' '+giftTag+'</div><div class="meta">'+sessionLabel+' · '+r.hours+'课时'+(r.isGifted?'':' · ¥'+fmt(r.perClassFee)+'/节')+'</div></div><div class="amount"><div class="num">'+(r.isGifted?'赠课':'¥'+fmt(r.amount))+'</div><div class="hours" style="cursor:pointer;color:var(--danger)" onclick="handleDeleteRecord(\''+r.id+'\')">删除</div></div></div>';
+      const noteTag = (r.note === '排课自动消课') ? '<span style="font-size:11px;color:var(--text-3);margin-left:4px">· 自动</span>' : '';
+      const checked = inBatch && detailBatchSelected.has(r.id);
+      const checkHtml = inBatch ? '<div class="batch-check '+(checked?'on':'')+'" onclick="event.stopPropagation();toggleBatchSelect(\''+r.id+'\')"></div>' : '';
+      const delHtml = inBatch ? '' : '<div class="hours" style="cursor:pointer;color:var(--danger)" onclick="handleDeleteRecord(\''+r.id+'\')">删除</div>';
+      return '<div class="record-item">'+checkHtml+'<div class="info"><div class="name">'+fmtDateFull(r.date)+' '+giftTag+noteTag+'</div><div class="meta">'+sessionLabel+' · '+r.hours+'课时'+(r.isGifted?'':' · ¥'+fmt(r.perClassFee)+'/节')+'</div></div><div class="amount"><div class="num">'+(r.isGifted?'赠课':'¥'+fmt(r.amount))+'</div>'+delHtml+'</div></div>';
     }).join('');
   }
   html += '</div>';
@@ -2303,6 +2359,65 @@ function handleAdjustAmount() {
   closeModal('modal-detail');
   renderHome(); renderStudents();
   showToast('单价调整成功');
+}
+
+// ===== 详情页消课记录批量删除 =====
+let detailBatchMode = false;
+let detailBatchStudentId = null;
+let detailBatchSelected = new Set();
+
+function enterBatchDelete() {
+  if (!currentViewingStudent) return;
+  detailBatchMode = true;
+  detailBatchStudentId = currentViewingStudent.id;
+  detailBatchSelected = new Set();
+  openDetail(currentViewingStudent.id);
+}
+
+function exitBatchDelete() {
+  detailBatchMode = false;
+  detailBatchStudentId = null;
+  detailBatchSelected = new Set();
+  if (currentViewingStudent) openDetail(currentViewingStudent.id);
+}
+
+function toggleBatchSelect(rid) {
+  if (detailBatchSelected.has(rid)) detailBatchSelected.delete(rid);
+  else detailBatchSelected.add(rid);
+  if (currentViewingStudent) openDetail(currentViewingStudent.id);
+}
+
+function batchSelectAll() {
+  const data = loadDB();
+  const records = data.records.filter(r => r.studentId === detailBatchStudentId && r.type !== 'adjust');
+  if (detailBatchSelected.size >= records.length) {
+    detailBatchSelected = new Set();
+  } else {
+    detailBatchSelected = new Set(records.map(r => r.id));
+  }
+  if (currentViewingStudent) openDetail(currentViewingStudent.id);
+}
+
+function batchDeleteSelected() {
+  if (detailBatchSelected.size === 0) { showToast('请先选择要删除的记录'); return; }
+  const count = detailBatchSelected.size;
+  const studentId = detailBatchStudentId;
+  showConfirm(
+    '确认删除选中的 ' + count + ' 条消课记录？\n课时和金额将自动回退。',
+    function() {
+      const data = loadDB();
+      data.records = data.records.filter(r => !detailBatchSelected.has(r.id));
+      recalcStudent(data, studentId);
+      saveDB(data);
+      detailBatchMode = false;
+      detailBatchStudentId = null;
+      detailBatchSelected = new Set();
+      currentViewingStudent = data.students.find(st => st.id === studentId);
+      openDetail(studentId);
+      renderHome();
+      showToast('已删除 ' + count + ' 条记录');
+    }
+  );
 }
 
 function handleDeleteRecord(recordId) {
