@@ -20,11 +20,21 @@
         document.body && document.body.appendChild(div);
       } catch(_) {}
     });
+    window.addEventListener('unhandledrejection', function(e) {
+      var reason = e.reason;
+      var msg = 'Unhandled Promise: ' + (reason && reason.message ? reason.message : String(reason));
+      try {
+        var div = document.createElement('div');
+        div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff4d4f;color:#fff;padding:10px;font-size:12px;font-family:monospace;line-height:1.4;word-break:break-all;max-height:50vh;overflow:auto';
+        div.textContent = msg;
+        document.body && document.body.appendChild(div);
+      } catch(_) {}
+    });
   </script>
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.1';
+      var APP_VERSION = 'v4.0.2';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -39,7 +49,7 @@
         }
         localStorage.setItem('__app_version', APP_VERSION);
         setTimeout(function(){
-          alert('发现旧版本缓存，已自动清理。\\n点"好"刷新到 v2.3.2');
+          alert('发现旧版本缓存，已自动清理。\\n点"好"刷新到 ' + APP_VERSION);
           location.reload(true);
         }, 100);
       } catch(e) {}
@@ -1397,7 +1407,13 @@ function adminLoadOrders() {
     } else {
       adminOrders = [];
       console.error('adminLoadOrders failed:', res);
+      if (res && res.msg) showToast('订单加载失败：' + res.msg);
     }
+    adminRenderOrders();
+  }).catch(function(err){
+    adminOrdersLoading = false;
+    console.error('adminLoadOrders exception:', err);
+    showToast('订单加载异常：' + (err.message || err));
     adminRenderOrders();
   });
 }
@@ -1463,6 +1479,9 @@ function adminConfirmOrder(orderId) {
       } else {
         showToast('开通失败：' + (res && res.msg ? res.msg : '未知错误'));
       }
+    }).catch(function(err){
+      console.error('adminConfirmOrder exception:', err);
+      showToast('开通异常：' + (err.message || err));
     });
   });
 }
@@ -1477,6 +1496,9 @@ function adminRejectOrder(orderId) {
       } else {
         showToast('操作失败：' + (res && res.msg ? res.msg : '未知错误'));
       }
+    }).catch(function(err){
+      console.error('adminRejectOrder exception:', err);
+      showToast('操作异常：' + (err.message || err));
     });
   });
 }
