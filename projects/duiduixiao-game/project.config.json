@@ -1,0 +1,39 @@
+{
+  "projectname": "躲避大师",
+  "appid": "your-app-id",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "preloadBackgroundData": false,
+    "minified": true,
+    "newFeature": true,
+    "coverView": true,
+    "nodeModules": true,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "scopeDataCheck": false,
+    "uglifyFileName": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "uploadWithSourceMap": true,
+    "compileHotReLoad": false,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "enableEngp": false,
+    "bundle": false,
+    "useIsolateContext": true,
+    "useCompilerModule": true,
+    "userConfirmedUseCompilerModule": true
+  },
+  "compileType": "game",
+  "condition": {},
+  "description": "一款简单上瘾的躲避类小游戏"
+}

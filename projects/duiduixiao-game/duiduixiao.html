@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>堆堆消 - 抖音小游戏</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; overflow: hidden; touch-action: none;
+  user-select: none; -webkit-user-select: none;
+}
+#game {
+  position: relative; width: 100%; max-width: 420px;
+  height: 100vh; max-height: 780px;
+  background: linear-gradient(180deg, #1a5276 0%, #1a3a5c 50%, #0d2137 100%);
+  overflow: hidden; border-radius: 20px;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+}
+canvas { display: block; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+
+/* Overlay screens */
+.overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  z-index: 10; background: rgba(0,0,0,0.88); color: #fff;
+}
+.overlay h1 { font-size: 2.8em; margin-bottom: 8px; letter-spacing: 4px; }
+.overlay .subtitle { font-size: 1em; color: #ffd700; margin-bottom: 30px; letter-spacing: 6px; }
+.overlay .icon-row { font-size: 2.5em; margin-bottom: 20px; letter-spacing: 8px; }
+.overlay .tips { font-size: 0.9em; color: #aaa; text-align: center; line-height: 1.8; margin-bottom: 30px; }
+.overlay .score-label { font-size: 1em; color: #ccc; margin-bottom: 4px; }
+.overlay .score-value { font-size: 3em; color: #ffd700; font-weight: bold; margin-bottom: 20px; }
+.btn {
+  padding: 14px 48px; font-size: 1.3em; font-weight: bold;
+  background: linear-gradient(135deg, #f9ca24 0%, #f0932b 100%);
+  color: #1a1a2e; border: none; border-radius: 50px;
+  cursor: pointer; letter-spacing: 2px;
+  box-shadow: 0 6px 25px rgba(249,202,36,0.4);
+  transition: transform 0.15s;
+}
+.btn:active { transform: scale(0.94); }
+.btn-small {
+  padding: 10px 32px; font-size: 1em; margin-top: 12px;
+  background: rgba(255,255,255,0.15); color: #fff;
+  box-shadow: none;
+}
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="c"></canvas>
+
+  <div id="startScreen" class="overlay">
+    <div class="icon-row">🍎🍊🍋</div>
+    <h1>堆堆消</h1>
+    <div class="subtitle">叠 层 三 消</div>
+    <div class="tips">
+      点方块 → 收到底部 <br>
+      凑齐 3 个相同 → 消除 <br>
+      底槽满 7 个 → 失败
+    </div>
+    <button class="btn" id="btnStart">开始挑战</button>
+  </div>
+
+  <div id="winScreen" class="overlay" style="display:none">
+    <div class="icon-row">🎉🎉🎉</div>
+    <h1>恭喜通关!</h1>
+    <div class="score-label">用时</div>
+    <div class="score-value" id="winTime">0s</div>
+    <button class="btn" id="btnWinRetry">再来一局</button>
+  </div>
+
+  <div id="loseScreen" class="overlay" style="display:none">
+    <div class="icon-row">😵</div>
+    <h1>槽满了!</h1>
+    <div class="score-label">消除了</div>
+    <div class="score-value" id="loseCleared">0 组</div>
+    <div class="tips">还剩 <span id="remainCount">0</span> 个方块没消掉</div>
+    <button class="btn" id="btnLoseRetry">再试一次</button>
+    <button class="btn btn-small" id="btnShuffle">🔄 打乱重排</button>
+  </div>
+
+  <div id="toolsBar" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:5;">
+    <button id="toolUndo" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:1.1em;cursor:pointer;display:none;">↩</button>
+    <button id="toolShuffle" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);color:#fff;font-size:1.1em;cursor:pointer;display:none;">🔀</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const container = document.getElementById('game');
+
+  const TILE_SIZE = 58;
+  const HOLD_MAX = 7;
+  const EMOJIS = ['🍎','🍊','🍋','🍇','🍓','🍒','🥝','🌽','🥕','🧅'];
+  const COLORS = ['#e74c3c','#f39c12','#f1c40f','#9b59b6','#e91e63','#c0392b','#2ecc71','#e67e22','#ff9800','#8e44ad'];
+
+  let W, H;
+  let tiles = [];
+  let holding = [];
+  let history = [];
+  let score = 0;
+  let gameState = 'idle'; // idle | playing | win | lose
+  let timerStart = 0;
+  let animQueue = [];
+
+  // ---- Layout ----
+  function buildLayout() {
+    const positions = [];
+    const cx = 200, cy = 280;
+    // Layer 0: 4x4 grid (16 tiles)
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        positions.push({ x: 30 + c * 85, y: 150 + r * 90, layer: 0 });
+      }
+    }
+    // Layer 1: 3x3 offset (9 tiles)
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        positions.push({ x: 72 + c * 85, y: 195 + r * 90, layer: 1 });
+      }
+    }
+    // Layer 2: 5 tiles scattered
+    positions.push({ x: 114, y: 230, layer: 2 });
+    positions.push({ x: 200, y: 280, layer: 2 });
+    positions.push({ x: 72, y: 350, layer: 2 });
+    positions.push({ x: 240, y: 220, layer: 2 });
+    positions.push({ x: 155, y: 380, layer: 2 });
+    return positions;
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function createTiles() {
+    const layout = buildLayout();
+    const types = [];
+    for (let i = 0; i < EMOJIS.length; i++) {
+      for (let j = 0; j < 3; j++) types.push(i);
+    }
+    shuffle(types);
+    tiles = layout.map((pos, idx) => ({
+      id: idx,
+      type: types[idx],
+      layer: pos.layer,
+      x: pos.x,
+      y: pos.y,
+      w: TILE_SIZE,
+      h: TILE_SIZE,
+      removed: false,
+      scale: 1,
+      opacity: 1,
+    }));
+  }
+
+  // ---- Check if a tile is covered ----
+  function isCovered(tile) {
+    for (const t of tiles) {
+      if (t.removed) continue;
+      if (t.layer <= tile.layer) continue;
+      // AABB overlap
+      if (tile.x < t.x + t.w && tile.x + tile.w > t.x &&
+          tile.y < t.y + t.h && tile.y + tile.h > t.y) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---- Get clickable tiles ----
+  function getClickableTiles() {
+    return tiles.filter(t => !t.removed && !isCovered(t));
+  }
+
+  // ---- Animate tile to holding ----
+  function animateTileToHolding(tile, targetIdx) {
+    const startX = tile.x + TILE_SIZE / 2;
+    const startY = tile.y + TILE_SIZE / 2;
+    const targetX = 40 + targetIdx * 48 + 24;
+    const targetY = H - 65;
+    const duration = 300;
+    const startTime = performance.now();
+
+    tile.removed = true; // Mark removed immediately to prevent re-click
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - t, 3);
+      const cx = startX + (targetX - startX) * ease;
+      const cy = startY + (targetY - startY) * ease;
+      const s = 1 - 0.4 * ease;
+
+      // Draw flying tile
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.translate(cx, cy);
+      ctx.scale(s, s);
+
+      // Tile background
+      const grad = ctx.createLinearGradient(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/2);
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(1, '#e8e8e8');
+      ctx.fillStyle = grad;
+      roundRect(ctx, -TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 10);
+      ctx.fill();
+      ctx.strokeStyle = COLORS[tile.type];
+      ctx.lineWidth = 3;
+      roundRect(ctx, -TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 10);
+      ctx.stroke();
+
+      // Emoji
+      ctx.font = '28px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(EMOJIS[tile.type], 0, 2);
+      ctx.restore();
+
+      if (t < 1) {
+        animQueue.push({ tile, targetIdx, startTime, started: true });
+      } else {
+        holding.push({ type: tile.type, from: tile.id });
+        checkMatch();
+        render();
+      }
+    }
+
+    // We'll handle animation in the render loop
+    return { tileId: tile.id, startX, startY, targetX, targetY, startTime, duration, targetIdx };
+  }
+
+  // ---- Check for matches in holding area ----
+  function checkMatch() {
+    const counts = {};
+    holding.forEach(h => { counts[h.type] = (counts[h.type] || 0) + 1; });
+    let matched = null;
+    for (const [type, count] of Object.entries(counts)) {
+      if (count >= 3) matched = parseInt(type);
+    }
+    if (matched !== null) {
+      // Remove 3 of that type
+      let removed = 0;
+      holding = holding.filter(h => {
+        if (h.type === matched && removed < 3) { removed++; return false; }
+        return true;
+      });
+      score++;
+      // Check win
+      const remaining = tiles.filter(t => !t.removed).length;
+      if (remaining === 0 && holding.length === 0) {
+        win();
+      }
+    } else if (holding.length >= HOLD_MAX) {
+      lose();
+    }
+  }
+
+  // ---- Win / Lose ----
+  function win() {
+    gameState = 'win';
+    const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+    document.getElementById('winTime').textContent = elapsed + 's';
+    document.getElementById('winScreen').style.display = 'flex';
+    document.getElementById('toolsBar').style.display = 'none';
+  }
+
+  function lose() {
+    gameState = 'lose';
+    const remaining = tiles.filter(t => !t.removed).length;
+    document.getElementById('loseCleared').textContent = score + ' 组';
+    document.getElementById('remainCount').textContent = remaining;
+    document.getElementById('loseScreen').style.display = 'flex';
+    document.getElementById('toolsBar').style.display = 'none';
+  }
+
+  // ---- Undo ----
+  function undo() {
+    if (history.length === 0) return;
+    // Undo the last addition to holding
+    const last = holding.pop();
+    if (!last) return;
+    const tile = tiles.find(t => t.id === last.from);
+    if (tile) {
+      tile.removed = false;
+    }
+    history.pop();
+    render();
+  }
+
+  // ---- Shuffle remaining tiles ----
+  function shuffleRemaining() {
+    const remaining = tiles.filter(t => !t.removed);
+    const types = remaining.map(t => t.type);
+    shuffle(types);
+    remaining.forEach((t, i) => { t.type = types[i]; });
+    render();
+  }
+
+  // ---- Render ----
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  function drawTile(tile) {
+    if (tile.removed) return;
+    const covered = isCovered(tile);
+    const x = tile.x, y = tile.y;
+    const size = TILE_SIZE;
+
+    ctx.save();
+
+    // Shadow for uncovered tiles
+    if (!covered) {
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 4;
+    }
+
+    // Layer offset (depth illusion)
+    const loff = tile.layer * 4;
+    const grad = ctx.createLinearGradient(x, y, x + size, y + size);
+    if (covered) {
+      grad.addColorStop(0, '#d0d0d0');
+      grad.addColorStop(1, '#a0a0a0');
+    } else {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#dcdcdc');
+    }
+    ctx.fillStyle = grad;
+    roundRect(ctx, x + loff, y + loff, size, size, 12);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    // Border
+    ctx.strokeStyle = covered ? '#888' : COLORS[tile.type];
+    ctx.lineWidth = covered ? 2 : 3;
+    roundRect(ctx, x + loff, y + loff, size, size, 12);
+    ctx.stroke();
+
+    // Emoji
+    ctx.globalAlpha = covered ? 0.45 : 1;
+    ctx.font = '28px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(EMOJIS[tile.type], x + loff + size / 2, y + loff + size / 2 + 2);
+
+    ctx.restore();
+  }
+
+  function drawHoldingArea() {
+    const barY = H - 85;
+    const barW = HOLD_MAX * 48 + 20;
+    const barX = (W - barW) / 2;
+
+    // Background bar
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    roundRect(ctx, barX, barY, barW, 52, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, barX, barY, barW, 52, 16);
+    ctx.stroke();
+
+    // Slots
+    for (let i = 0; i < HOLD_MAX; i++) {
+      const sx = barX + 12 + i * 48;
+      const sy = barY + 4;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      roundRect(ctx, sx, sy, 40, 44, 8);
+      ctx.fill();
+    }
+
+    // Holding tiles
+    holding.forEach((h, i) => {
+      const sx = barX + 12 + i * 48 - 4;
+      const sy = barY;
+
+      // Mini tile
+      const grad = ctx.createLinearGradient(sx, sy, sx + 48, sy + 48);
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(1, '#e8e8e8');
+      ctx.fillStyle = grad;
+      roundRect(ctx, sx, sy, 48, 48, 10);
+      ctx.fill();
+      ctx.strokeStyle = COLORS[h.type];
+      ctx.lineWidth = 2.5;
+      roundRect(ctx, sx, sy, 48, 48, 10);
+      ctx.stroke();
+
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(EMOJIS[h.type], sx + 24, sy + 26);
+    });
+
+    // Warning indicator when almost full
+    if (holding.length >= 5 && gameState === 'playing') {
+      const pulse = Math.sin(Date.now() / 300) * 0.5 + 0.5;
+      ctx.strokeStyle = `rgba(231,76,60,${0.3 + pulse * 0.7})`;
+      ctx.lineWidth = 3;
+      roundRect(ctx, barX, barY, barW, 52, 16);
+      ctx.stroke();
+    }
+  }
+
+  function drawTitle() {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'bold 22px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('堆堆消', W / 2, 42);
+
+    // Score
+    ctx.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('已消 ' + score + ' 组', W / 2, 65);
+  }
+
+  function drawRemainingCount() {
+    const remaining = tiles.filter(t => !t.removed).length;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('剩余 ' + remaining + ' 块', W / 2, 80);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background pattern
+    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    for (let i = 0; i < 30; i++) {
+      const x = (i * 137) % W;
+      const y = (i * 73) % H;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw tiles sorted by layer (lower first)
+    const sorted = [...tiles].sort((a, b) => a.layer - b.layer);
+    sorted.forEach(drawTile);
+
+    // Draw holding area
+    drawHoldingArea();
+
+    // Draw title
+    drawTitle();
+    drawRemainingCount();
+
+    // Process animation queue
+    if (animQueue.length > 0) {
+      const now = performance.now();
+      for (const anim of animQueue) {
+        const elapsed = now - anim.startTime;
+        if (elapsed >= anim.duration) {
+          holding.push({ type: anim.tile.type, from: anim.tileId });
+          animQueue = animQueue.filter(a => a !== anim);
+          checkMatch();
+        }
+      }
+      if (animQueue.length > 0) {
+        requestAnimationFrame(() => render());
+      }
+    }
+  }
+
+  function gameLoop() {
+    if (gameState !== 'playing') return;
+    render();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ---- Click handling ----
+  function handleClick(ex, ey) {
+    if (gameState !== 'playing') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const cx = (ex - rect.left) * scaleX;
+    const cy = (ey - rect.top) * scaleY;
+
+    // Check tiles in reverse layer order (top first)
+    const sorted = [...tiles]
+      .filter(t => !t.removed && !isCovered(t))
+      .sort((a, b) => b.layer - a.layer);
+
+    for (const tile of sorted) {
+      const loff = tile.layer * 4;
+      if (cx >= tile.x + loff && cx <= tile.x + loff + TILE_SIZE &&
+          cy >= tile.y + loff && cy <= tile.y + loff + TILE_SIZE) {
+        // Clicked!
+        history.push({ type: tile.type, id: tile.id });
+        tile.removed = true;
+        holding.push({ type: tile.type, from: tile.id });
+        checkMatch();
+
+        // Particles
+        spawnParticles(tile.x + TILE_SIZE/2, tile.y + TILE_SIZE/2, COLORS[tile.type]);
+
+        render();
+        return;
+      }
+    }
+  }
+
+  function spawnParticles(x, y, color) {
+    // Simple visual feedback
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count;
+      const dist = 20 + Math.random() * 15;
+      const px = x + Math.cos(angle) * dist;
+      const py = y + Math.sin(angle) * dist;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, 3 + Math.random() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---- Game control ----
+  function startGame() {
+    createTiles();
+    holding = [];
+    history = [];
+    score = 0;
+    animQueue = [];
+    gameState = 'playing';
+    timerStart = Date.now();
+
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('winScreen').style.display = 'none';
+    document.getElementById('loseScreen').style.display = 'none';
+    document.getElementById('toolsBar').style.display = 'flex';
+    document.getElementById('toolUndo').style.display = 'block';
+    document.getElementById('toolShuffle').style.display = 'block';
+
+    render();
+    gameLoop();
+  }
+
+  // ---- Resize ----
+  function resize() {
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width * (window.devicePixelRatio || 1);
+    canvas.height = rect.height * (window.devicePixelRatio || 1);
+    W = rect.width;
+    H = rect.height;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    if (gameState === 'playing') render();
+  }
+
+  // ---- Events ----
+  canvas.addEventListener('click', e => handleClick(e.clientX, e.clientY));
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    handleClick(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnWinRetry').addEventListener('click', startGame);
+  document.getElementById('btnLoseRetry').addEventListener('click', startGame);
+  document.getElementById('btnShuffle').addEventListener('click', () => {
+    if (gameState === 'lose') { startGame(); return; }
+    shuffleRemaining();
+  });
+  document.getElementById('toolUndo').addEventListener('click', undo);
+  document.getElementById('toolShuffle').addEventListener('click', () => {
+    if (gameState === 'lose') { startGame(); return; }
+    shuffleRemaining();
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  render();
+})();
+</script>
+</body>
+</html>
