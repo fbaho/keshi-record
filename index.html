@@ -24,7 +24,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v3.0.0';
+      var APP_VERSION = 'v3.0.1';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1396,21 +1396,33 @@ function afterAuthSuccess(phone, isRegister) {
     } else {
       // 云端无数据
       if (isRegister) {
-        var emptyData = { students: [], records: [], version: '3.0.0' };
-        try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(emptyData)); } catch(e) {}
-        // 检查是否有旧数据可迁移
+        // 先检查本地是否已有该手机号的数据（v2.x 老用户重新注册，绝不能被空数据覆盖）
+        var existingData = null;
         try {
-          if (localStorage.getItem(LEGACY_DB_KEY) || LEGACY_KEYS.some(function(k){ return localStorage.getItem(k); })) {
-            migrateLegacyData(phone);
-            // 迁移后推送到云端
-            var migratedData = loadDB();
-            if (migratedData.students && migratedData.students.length > 0) {
-              cbPushData(CB_UID, migratedData, getCBExtra());
-            }
-          }
+          var raw = localStorage.getItem('keshi_data_' + phone);
+          if (raw) existingData = JSON.parse(raw);
         } catch(e) {}
-        enterApp();
-        showToast('注册成功');
+        // 本地没有才查更老版本的数据 key
+        if (!existingData || !existingData.students || existingData.students.length === 0) {
+          try {
+            if (localStorage.getItem(LEGACY_DB_KEY) || LEGACY_KEYS.some(function(k){ return localStorage.getItem(k); })) {
+              migrateLegacyData(phone);
+              existingData = loadDB();
+            }
+          } catch(e) {}
+        }
+        if (existingData && existingData.students && existingData.students.length > 0) {
+          // 本地有数据 → 推送到云端（多机同步）
+          cbPushData(CB_UID, existingData, getCBExtra());
+          enterApp();
+          showToast('注册成功，本地数据已上传云端');
+        } else {
+          // 全新用户 → 空数据
+          var emptyData = { students: [], records: [], version: '3.0.0' };
+          try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(emptyData)); } catch(e) {}
+          enterApp();
+          showToast('注册成功');
+        }
       } else {
         // 老用户首次云端登录，本地有数据 → 推送到云端
         var localData = loadDB();
