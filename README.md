@@ -12,15 +12,6 @@
 - 原始版本，含 Vue.js 框架、APK 安装包
 - 独立的 CSS/JS 文件结构
 
-### 3. 对对消游戏 (projects/duiduixiao-game/)
-- HTML 小游戏
-- 含游戏说明和上架指南
-
-### 4. 秦始皇归来 (projects/survival-hunter/)
-- HTML 游戏项目
-- 含素材资源、Python 脚本、PDF 说明文档
-- 本地服务器 server.js
-
 ## 部署地址
 - 课时记录 v2.4.0: https://be5606aa3a1646f58bec63a14ea40aab.app.codebuddy.work/index.html
 
