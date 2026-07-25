@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.7';
+      var APP_VERSION = 'v4.0.8';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -809,6 +809,48 @@ function cbPullData(uid) {
     if (res && res.data && res.data.length > 0) return res.data[0];
     return null;
   }).catch(function(){ return null; });
+}
+
+// 合并本地与云端数据：避免云端旧数据覆盖本地未推送的修改
+// 策略：students 按 id 取并集，冲突时 lastAutoCheckDate 较新的一边胜出
+//       records 按 id 取并集，本地优先（id 是唯一的，几乎不会冲突）
+function mergeLocalAndCloud(localData, cloudData) {
+  if (!cloudData || !cloudData.students) return localData;
+  if (!localData || !localData.students) return cloudData;
+
+  // students：本地顺序优先，冲突时取 lastAutoCheckDate 较新的整对象
+  const localIds = new Set();
+  const mergedStudents = [];
+  localData.students.forEach(function(ls){
+    localIds.add(ls.id);
+    const cs = cloudData.students.find(function(c){ return c.id === ls.id; });
+    if (!cs) { mergedStudents.push(ls); return; }
+    const localNew = ls.lastAutoCheckDate || '';
+    const cloudNew = cs.lastAutoCheckDate || '';
+    // 取较新的整对象（保留本地字段完整性，避免云端覆盖中间状态）
+    mergedStudents.push(localNew >= cloudNew ? ls : cs);
+  });
+  // 云端独有学员追加到末尾
+  cloudData.students.forEach(function(cs){
+    if (!localIds.has(cs.id)) mergedStudents.push(cs);
+  });
+
+  // records：按 id 并集，本地优先
+  const localRecordIds = new Set();
+  const mergedRecords = [];
+  localData.records.forEach(function(r){
+    localRecordIds.add(r.id);
+    mergedRecords.push(r);
+  });
+  cloudData.records.forEach(function(cr){
+    if (!localRecordIds.has(cr.id)) mergedRecords.push(cr);
+  });
+
+  return {
+    students: mergedStudents,
+    records: mergedRecords,
+    version: cloudData.version || localData.version
+  };
 }
 
 // 推送本地数据到云端（整文档 set）
@@ -1709,9 +1751,13 @@ function afterAuthSuccess(phone, isRegister) {
     return cbPullData(CB_UID);
   }).then(function(cloudDoc){
     if (cloudDoc && cloudDoc.data) {
-      // 云端有数据 → 覆盖本地（多机同步）
-      try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(cloudDoc.data)); } catch(e) {}
+      // 云端有数据 → 合并本地与云端（多机同步，不丢失本地未推送的修改）
+      var localData = loadDB();
+      var merged = mergeLocalAndCloud(localData, cloudDoc.data);
+      try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(merged)); } catch(e) {}
       syncCloudMetaToLocal(phone, cloudDoc);
+      // 推送合并结果到云端，保持一致
+      cbPushData(CB_UID, merged, getCBExtra());
       enterApp();
       showToast(isRegister ? '注册成功' : '已同步云端数据');
     } else {
@@ -1836,8 +1882,8 @@ function enterApp() {
   loadDB();
   renderHome();
   renderStudents();
-  // 检查排课自动消课
-  setTimeout(checkAutoDeduct, 500);
+  // 检查排课自动消课（延迟到 cbPullData 合并完成后执行，避免读到旧数据）
+  setTimeout(checkAutoDeduct, 1500);
 }
 
 function showAuthPage() {
@@ -2082,6 +2128,8 @@ function confirmAutoDeduct() {
   });
 
   saveDB(data);
+  // 立即推送云端，不等防抖，避免用户立即关 App 导致推送丢失
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   closeModal('modal-auto-deduct');
   pendingAutoDeductions = [];
   renderHome(); renderStudents();
@@ -2102,6 +2150,8 @@ function skipAutoDeduct() {
     }
   });
   saveDB(data);
+  // 立即推送云端，避免用户立即关 App 导致推送丢失
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   closeModal('modal-auto-deduct');
   pendingAutoDeductions = [];
   showToast('已跳过，可稍后手动消课');
@@ -4012,8 +4062,13 @@ function parseExcelToData(wb) {
       // 后台从云端拉取最新数据（多机同步）
       cbPullData(CB_UID).then(function(cloudDoc){
         if (cloudDoc && cloudDoc.data) {
-          try { localStorage.setItem('keshi_data_' + localPhone, JSON.stringify(cloudDoc.data)); } catch(e) {}
+          // 合并本地与云端，避免云端旧数据覆盖本地未推送的修改
+          var localData = loadDB();
+          var merged = mergeLocalAndCloud(localData, cloudDoc.data);
+          try { localStorage.setItem('keshi_data_' + localPhone, JSON.stringify(merged)); } catch(e) {}
           syncCloudMetaToLocal(localPhone, cloudDoc);
+          // 推送合并结果到云端，保持一致
+          cbPushData(CB_UID, merged, getCBExtra());
           if (typeof renderHome === 'function') renderHome();
           if (typeof renderStudents === 'function') renderStudents();
           if (typeof updateMemberBadge === 'function') updateMemberBadge();
