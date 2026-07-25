@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.6';
+      var APP_VERSION = 'v4.0.7';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1922,12 +1922,22 @@ function getWeekdaysFromToggles(containerId) {
   return days.sort((a,b) => a - b);
 }
 
+// 返回本地日期 YYYY-MM-DD，避免 toISOString() 转 UTC 少一天（GMT+8 时区）
+function toLocalDateString(d) {
+  if (!d) d = new Date();
+  if (typeof d === 'string') d = new Date(d);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
 // ===== 排课自动消课检查 =====
 let pendingAutoDeductions = [];
 
 function checkAutoDeduct() {
   const data = loadDB();
-  const today = new Date().toISOString().slice(0,10);
+  const today = toLocalDateString(new Date());
   const todayDate = new Date(today + 'T00:00:00');
   pendingAutoDeductions = [];
 
@@ -1954,7 +1964,7 @@ function checkAutoDeduct() {
       const jsDay = iter.getDay();
       const weekday = jsDay === 0 ? 7 : jsDay; // 1=Mon ... 7=Sun
       if (s.schedule.includes(weekday)) {
-        const dateStr = iter.toISOString().slice(0,10);
+        const dateStr = toLocalDateString(iter);
         // 检查该日期是否已有消课记录
         const hasRecord = data.records.some(r =>
           r.studentId === s.id && r.date === dateStr && r.type !== 'adjust'
@@ -2040,7 +2050,7 @@ function confirmAutoDeduct() {
   const data = loadDB();
   let totalRecords = 0;
   let totalHours = 0;
-  const today = new Date().toISOString().slice(0,10);
+  const today = toLocalDateString(new Date());
 
   pendingAutoDeductions.forEach((item, idx) => {
     const s = data.students.find(st => st.id === item.student.id);
@@ -2084,7 +2094,7 @@ function confirmAutoDeduct() {
 
 function skipAutoDeduct() {
   const data = loadDB();
-  const today = new Date().toISOString().slice(0,10);
+  const today = toLocalDateString(new Date());
   // 更新所有有排课的学员的 lastAutoCheckDate，避免重复提醒
   data.students.forEach(s => {
     if (s.schedule && s.schedule.length > 0) {
@@ -2111,7 +2121,7 @@ function migrateDB() {
     if (s.schedule === undefined) {
       s.schedule = [];
       s.scheduleHours = 1;
-      s.lastAutoCheckDate = s.createdAt ? s.createdAt.slice(0,10) : new Date().toISOString().slice(0,10);
+      s.lastAutoCheckDate = s.createdAt ? s.createdAt.slice(0,10) : toLocalDateString(new Date());
       changed = true;
     }
   });
@@ -2160,7 +2170,7 @@ function addStudentDB(s) {
     notes: s.notes || '', createdAt: new Date().toISOString(),
     schedule: s.schedule || [],
     scheduleHours: s.scheduleHours || 1,
-    lastAutoCheckDate: new Date().toISOString().slice(0,10)
+    lastAutoCheckDate: toLocalDateString(new Date())
   };
   data.students.push(ns);
   saveDB(data);
