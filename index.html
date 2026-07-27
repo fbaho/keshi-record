@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.11';
+      var APP_VERSION = 'v4.0.12';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -63,7 +63,7 @@
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{--primary:#007AFF;--primary-dark:#0051D5;--primary-light:#E3F0FF;--danger:#FF3B30;--danger-light:#FFEBEE;--warning:#FF9500;--warning-light:#FFF4E6;--text-1:#1C1C1E;--text-2:#8E8E93;--text-3:#AEAEB2;--bg-page:#F2F2F7;--bg-card:#fff;--bg-grouped:#F2F2F7;--bg-input:#EFEFF4;--border:#C6C6C8;--border-light:#E5E5EA;--radius:16px;--radius-sm:12px;--shadow:0 1px 4px rgba(0,0,0,.06);--shadow-card:0 2px 12px rgba(0,0,0,.05);--tab-h:58px}
     html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif;font-size:16px;color:var(--text-1);background:var(--bg-page);-webkit-font-smoothing:antialiased}
-    #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg-page);position:relative;padding-bottom:var(--tab-h)}
+    #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg-page);position:relative;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom, 0px))}
     .page{display:none;min-height:100vh}.page.active{display:block;animation:fadeIn .25s ease}
     @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
     .navbar{position:sticky;top:0;z-index:100;background:rgba(248,248,250,.8);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--text-1);padding:12px 16px;text-align:center;font-size:17px;font-weight:600;letter-spacing:-.3px;border-bottom:.5px solid var(--border-light)}
@@ -260,19 +260,24 @@
     .hm-legend .swatches{display:flex;gap:2px}
     .hm-legend .sw{width:11px;height:11px;border-radius:3px;border:.5px solid rgba(0,0,0,.06)}
     .hm-tip{position:fixed;background:#1C1C1E;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none}
-    /* 近一月日历热力图 */
-    .hm-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-    .hm-cal-hd{text-align:center;font-size:12px;font-weight:600;color:var(--text-3);padding:4px 0}
-    .hm-cal-cell{border-radius:8px;padding:6px 4px;text-align:center;min-height:52px;display:flex;flex-direction:column;justify-content:center;transition:transform .12s}
-    .hm-cal-cell.empty{background:transparent}
-    .hm-cal-cell.has-rev{cursor:pointer}
-    .hm-cal-cell.has-rev:active{transform:scale(.94)}
-    .hm-cal-cell.today{box-shadow:0 0 0 2px var(--primary)}
-    .hm-cal-cell .hm-d{font-size:13px;font-weight:600;color:var(--text-1)}
-    .hm-cal-cell.has-rev .hm-d{color:#fff}
-    .hm-cal-cell .hm-amt{font-size:11px;font-weight:500;margin-top:2px}
-    .hm-cal-cell .hm-amt.none{color:var(--text-3);opacity:.4}
-    .hm-cal-cell.has-rev .hm-amt{color:rgba(255,255,255,.9)}
+    /* 近一月：横向滚动 30 天 */
+    .hm-month-scroll{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;scroll-snap-type:x proximity}
+    .hm-month-scroll::-webkit-scrollbar{height:4px}
+    .hm-month-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .hm-day-cell{flex:0 0 auto;width:52px;border-radius:10px;padding:7px 4px 6px;text-align:center;background:#f0f0f5;display:flex;flex-direction:column;align-items:center;scroll-snap-align:start;transition:transform .12s}
+    .hm-day-cell.has-rev{cursor:pointer}
+    .hm-day-cell.has-rev:active{transform:scale(.92)}
+    .hm-day-cell.today{box-shadow:0 0 0 2px var(--primary)}
+    .hm-day-month{font-size:9px;font-weight:600;color:var(--primary);height:12px;line-height:12px}
+    .hm-day-month.blank{visibility:hidden}
+    .hm-day-num{font-size:15px;font-weight:700;color:var(--text-1);line-height:1.2}
+    .hm-day-week{font-size:9px;color:var(--text-3);margin-top:1px}
+    .hm-day-amt{font-size:10px;font-weight:600;margin-top:4px;line-height:1.1;white-space:nowrap}
+    .hm-day-amt.none{color:var(--text-3);opacity:.35}
+    .hm-day-cell.has-rev .hm-day-num{color:#fff}
+    .hm-day-cell.has-rev .hm-day-week{color:rgba(255,255,255,.7)}
+    .hm-day-cell.has-rev .hm-day-amt{color:rgba(255,255,255,.95)}
+    .hm-day-cell.has-rev .hm-day-month{color:rgba(255,255,255,.85)}
     /* 概览：课均收入排行 */
     .ov-avg-row{display:flex;align-items:center;padding:12px 0;border-bottom:.5px solid var(--border-light);cursor:pointer}
     .ov-avg-row:last-child{border-bottom:none}
@@ -590,7 +595,7 @@
         <label style="display:flex;align-items:center;gap:5px"><svg class="ico ico-sm"><use href="#icon-calendar"/></svg> 上课日期</label>
         <input type="date" id="consume-date-input">
       </div>
-      <div id="consume-list" style="padding-bottom:80px"></div>
+      <div id="consume-list" style="padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px))"></div>
       <div id="consume-footer" class="consume-footer" style="display:none">
         <div class="summary">已选 <span class="highlight" id="cf-count">0</span> 人 · <span class="highlight" id="cf-hours">0</span> 课时 · ¥<span class="highlight" id="cf-amount">0.00</span></div>
         <button class="btn btn-primary" onclick="handleConsume()">确认消课</button>
@@ -3338,36 +3343,25 @@ function renderRevenueHeatmap(records, range, targetId) {
     '</div></div>';
 
   if (range === 'month') {
-    // ===== 近一月：横向日历网格 =====
-    var days = 28; // 4周
+    // ===== 近一月：纯横向滚动 30 天 =====
+    var days = 30;
     var start = new Date(today);
     start.setDate(start.getDate() - (days - 1));
-    // 调整到周一开始
-    var startDay = start.getDay();
-    var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
-    start.setDate(start.getDate() + offsetToMon);
-
-    var weekDayNames = ['一','二','三','四','五','六','日'];
-    html += '<div class="hm-cal">';
-    // 表头
-    weekDayNames.forEach(function(n){
-      html += '<div class="hm-cal-hd">' + n + '</div>';
-    });
-    // 日期格子
-    var totalCells = Math.ceil((days + Math.abs(offsetToMon)) / 7) * 7;
-    for (var i = 0; i < totalCells; i++) {
+    var weekDayNames = ['日','一','二','三','四','五','六'];
+    var scrollId = 'hm-month-scroll-' + (targetId || 'home');
+    html += '<div class="hm-month-scroll" id="' + scrollId + '">';
+    for (var i = 0; i < days; i++) {
       var cellDate = new Date(start.getTime() + i * 86400000);
-      if (cellDate > today || cellDate < new Date(today.getTime() - (days-1+6) * 86400000)) {
-        html += '<div class="hm-cal-cell empty"></div>';
-        continue;
-      }
       var dateStr = toLocalDateString(cellDate);
       var amt = byDate[dateStr] || 0;
       var isToday = toLocalDateString(today) === dateStr;
-      html += '<div class="hm-cal-cell' + (amt > 0 ? ' has-rev' : '') + (isToday ? ' today' : '') + '" ' +
+      var showMonth = cellDate.getDate() === 1 || i === 0;
+      html += '<div class="hm-day-cell' + (amt >= 0.01 ? ' has-rev' : '') + (isToday ? ' today' : '') + '" ' +
         'data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" style="background:' + colorOf(amt) + '">' +
-        '<div class="hm-d">' + cellDate.getDate() + '</div>' +
-        (amt > 0 ? '<div class="hm-amt">¥' + fmt(amt) + '</div>' : '<div class="hm-amt none">—</div>') +
+        '<div class="hm-day-month' + (showMonth ? '' : ' blank') + '">' + (showMonth ? (cellDate.getMonth()+1) + '月' : '·') + '</div>' +
+        '<div class="hm-day-num">' + cellDate.getDate() + '</div>' +
+        '<div class="hm-day-week">' + weekDayNames[cellDate.getDay()] + '</div>' +
+        (amt >= 0.01 ? '<div class="hm-day-amt">¥' + fmt(amt) + '</div>' : '<div class="hm-day-amt none">—</div>') +
         '</div>';
     }
     html += '</div>';
@@ -3437,10 +3431,20 @@ function renderRevenueHeatmap(records, range, targetId) {
   html += '</div><span>多</span></div>';
   card.innerHTML = html;
 
-  // Tooltip for year mode cells
+  // 近一月横向条带：自动滚到最右侧（今天）
+  if (range === 'month') {
+    var scroller = card.querySelector('.hm-month-scroll');
+    if (scroller) {
+      requestAnimationFrame(function(){
+        scroller.scrollLeft = scroller.scrollWidth;
+      });
+    }
+  }
+
+  // Tooltip for heatmap cells (year + month mode)
   var tip = document.getElementById('hm-tip');
   if (!tip) { tip = document.createElement('div'); tip.id = 'hm-tip'; tip.className = 'hm-tip'; document.body.appendChild(tip); }
-  card.querySelectorAll('.hm-cell').forEach(function(cell){
+  card.querySelectorAll('.hm-cell, .hm-day-cell').forEach(function(cell){
     cell.addEventListener('click', function(){
       var amt = parseFloat(this.getAttribute('data-amt'));
       var d = new Date(this.getAttribute('data-date'));
