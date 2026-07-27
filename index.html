@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.8';
+      var APP_VERSION = 'v4.0.9';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -246,6 +246,30 @@
     .custom-range .cr-quick .qbtn{padding:5px 12px;font-size:13px;border:none;border-radius:16px;color:var(--primary);background:var(--primary-light);cursor:pointer;white-space:nowrap;font-weight:500}
     .custom-range .cr-quick .qbtn:active{opacity:.7}
     .custom-empty{text-align:center;padding:80px 20px;color:var(--text-3);font-size:14px}
+    /* 概览：收入热力图 */
+    .hm-title{font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:5px}
+    .hm-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+    .hm-scroll::-webkit-scrollbar{height:4px}
+    .hm-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .hm-svg{display:block}
+    .hm-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);justify-content:flex-end;margin-top:8px}
+    .hm-legend .swatches{display:flex;gap:2px}
+    .hm-legend .sw{width:11px;height:11px;border-radius:2px;border:.5px solid rgba(0,0,0,.06)}
+    .hm-tip{position:fixed;background:#333;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none}
+    /* 概览：课均收入排行 */
+    .ov-avg-row{display:flex;align-items:center;padding:12px 0;border-bottom:.5px solid var(--border-light);cursor:pointer}
+    .ov-avg-row:last-child{border-bottom:none}
+    .ov-avg-row:active{background:var(--bg-input)}
+    .ov-avg-row .av-rank{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-right:10px;flex-shrink:0;background:var(--bg-input);color:var(--text-3)}
+    .ov-avg-row .av-rank.t1{background:#FFD700;color:#fff}
+    .ov-avg-row .av-rank.t2{background:#C0C0C0;color:#fff}
+    .ov-avg-row .av-rank.t3{background:#CD7F32;color:#fff}
+    .ov-avg-row .av-info{flex:1;min-width:0}
+    .ov-avg-row .av-name{font-size:15px;font-weight:500;color:var(--text-1)}
+    .ov-avg-row .av-meta{font-size:12px;color:var(--text-3);margin-top:2px}
+    .ov-avg-row .av-val{text-align:right;flex-shrink:0;margin-left:10px}
+    .ov-avg-row .av-val .v{font-size:16px;font-weight:600;color:var(--primary)}
+    .ov-avg-row .av-val .u{font-size:11px;color:var(--text-3);margin-top:1px}
     .detail-header{background:linear-gradient(135deg,#007AFF,#0051D5);padding:24px;color:#fff;text-align:center;border-radius:var(--radius)}
     .detail-header .avatar-lg{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.25);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600}
     .detail-header .name{font-size:20px;font-weight:600}
@@ -574,6 +598,7 @@
       <div class="stats-tab active" onclick="loadStats('month')">本月</div>
       <div class="stats-tab" onclick="loadStats('all')">全部</div>
       <div class="stats-tab" onclick="loadPeriodStats('month')">周期</div>
+      <div class="stats-tab" onclick="loadOverview()">概览</div>
     </div>
     <div id="stats-overview" class="stats-overview"></div>
     <div id="stats-chart" class="chart-container" style="display:none"></div>
@@ -605,6 +630,11 @@
       <div id="custom-list"></div>
       <div id="period-summary" style="margin:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
       <div id="period-list"></div>
+    </div>
+    <div id="stats-overview-page" style="display:none">
+      <div id="ov-heatmap-card" class="chart-container"></div>
+      <div id="ov-avg-card" class="chart-container"></div>
+      <div id="ov-student-list"></div>
     </div>
     <div id="stats-empty" class="empty-state" style="display:none"><div class="icon"><svg class="ico ico-xl ico-text"><use href="#icon-chart"/></svg></div><div class="text">该时间段暂无消课记录</div></div>
     <div style="padding:12px;margin-bottom:20px;display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportExcelXlsx()"><svg class="ico ico-sm"><use href="#icon-share"/></svg>导出 Excel</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportDataBackup()"><svg class="ico ico-sm"><use href="#icon-download"/></svg>备份 JSON</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="document.getElementById('import-file').click()"><svg class="ico ico-sm"><use href="#icon-upload"/></svg>导入</button><input type="file" id="import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importDataBackup(event)"></div>
@@ -3289,6 +3319,196 @@ function handleBatchConsume() {
   }, null, '确认补录');
 }
 
+// ===== 概览：收入热力图 + 课均收入排行 =====
+function loadOverview() {
+  document.querySelectorAll('.stats-tab').forEach(function(t){ t.classList.remove('active'); });
+  var tabs = document.querySelectorAll('.stats-tab');
+  tabs[4].classList.add('active');
+  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-period'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('stats-overview-page').style.display = 'block';
+
+  var data = loadDB();
+  var records = (data.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
+
+  renderRevenueHeatmap(records);
+  renderAvgRevenue(data, records);
+}
+
+// 收入热力图（GitHub 风格年度日历）
+function renderRevenueHeatmap(records) {
+  var card = document.getElementById('ov-heatmap-card');
+  // 按日期汇总金额
+  var byDate = {};
+  records.forEach(function(r){
+    if (!byDate[r.date]) byDate[r.date] = 0;
+    byDate[r.date] += (r.amount || 0);
+  });
+  var amounts = Object.values(byDate);
+  var maxAmt = amounts.length ? Math.max.apply(null, amounts) : 0;
+
+  // 颜色分级
+  function colorOf(amt) {
+    if (amt <= 0) return '#ebedf0';
+    var ratio = maxAmt > 0 ? amt / maxAmt : 0;
+    if (ratio < 0.25) return '#c6e0ff';
+    if (ratio < 0.5)  return '#79b8ff';
+    if (ratio < 0.75) return '#2188ff';
+    return '#0051D5';
+  }
+
+  // 构建最近 365 天的日期网格
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  // 从今天往前推到最近的周日对齐（GitHub 是从周日开始）
+  // 我们用周一为一周起点：找到 365 天前那个周一
+  var start = new Date(today);
+  start.setDate(start.getDate() - 364);
+  // 调整到周一（getDay: 0=周日, 1=周一...）
+  var startDay = start.getDay();
+  var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
+  start.setDate(start.getDate() + offsetToMon);
+
+  // 计算周数
+  var totalDays = Math.floor((today - start) / 86400000) + 1;
+  var weeks = Math.ceil(totalDays / 7);
+  if (weeks < 1) weeks = 1;
+
+  var cellSize = 11;
+  var gap = 2;
+  var leftPad = 22; // 星期标签
+  var topPad = 16;  // 月份标签
+  var svgW = leftPad + weeks * (cellSize + gap);
+  var svgH = topPad + 7 * (cellSize + gap);
+
+  var dayNames = ['', '一', '', '三', '', '五', ''];
+  var monthLabels = [];
+  var lastMonth = -1;
+  for (var w = 0; w < weeks; w++) {
+    var weekStart = new Date(start.getTime() + w * 7 * 86400000);
+    var m = weekStart.getMonth();
+    if (m !== lastMonth && weekStart.getDate() <= 7) {
+      monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
+      lastMonth = m;
+    } else if (w === 0) {
+      monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
+      lastMonth = m;
+    }
+  }
+
+  // 构建 SVG
+  var svg = '<div class="hm-title">' + svgIcon('trending-up') + ' 收入热力图（近一年）</div>';
+  svg += '<div class="hm-scroll"><svg class="hm-svg" width="' + svgW + '" height="' + svgH + '">';
+  // 月份标签
+  monthLabels.forEach(function(ml){
+    svg += '<text x="' + ml.x + '" y="11" font-size="10" fill="#999">' + ml.label + '</text>';
+  });
+  // 星期标签
+  for (var d = 0; d < 7; d++) {
+    if (dayNames[d]) {
+      svg += '<text x="0" y="' + (topPad + d * (cellSize + gap) + cellSize - 1) + '" font-size="9" fill="#999">' + dayNames[d] + '</text>';
+    }
+  }
+  // 日期格子
+  for (var w = 0; w < weeks; w++) {
+    for (var dd = 0; dd < 7; dd++) {
+      var cellDate = new Date(start.getTime() + (w * 7 + dd) * 86400000);
+      if (cellDate > today) continue;
+      var dateStr = toLocalDateString(cellDate);
+      var amt = byDate[dateStr] || 0;
+      var x = leftPad + w * (cellSize + gap);
+      var y = topPad + dd * (cellSize + gap);
+      svg += '<rect class="hm-cell" data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" rx="2" fill="' + colorOf(amt) + '" stroke="rgba(0,0,0,.04)" stroke-width=".5" style="cursor:pointer"/>';
+    }
+  }
+  svg += '</svg></div>';
+  svg += '<div class="hm-legend"><span>少</span><div class="swatches">';
+  ['#ebedf0','#c6e0ff','#79b8ff','#2188ff','#0051D5'].forEach(function(c){
+    svg += '<div class="sw" style="background:' + c + '"></div>';
+  });
+  svg += '</div><span>多</span></div>';
+  card.innerHTML = svg;
+
+  // 交互：点击/触摸格子显示 tooltip
+  var tip = document.getElementById('hm-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'hm-tip';
+    tip.className = 'hm-tip';
+    document.body.appendChild(tip);
+  }
+  card.querySelectorAll('.hm-cell').forEach(function(cell){
+    cell.addEventListener('click', function(e){
+      var date = this.getAttribute('data-date');
+      var amt = parseFloat(this.getAttribute('data-amt'));
+      var d = new Date(date);
+      var txt = (d.getMonth()+1) + '月' + d.getDate() + '日 · ' + (amt > 0 ? '¥' + fmt(amt) : '无收入');
+      tip.textContent = txt;
+      tip.style.display = 'block';
+      var rect = this.getBoundingClientRect();
+      tip.style.left = (rect.left + rect.width / 2 - tip.offsetWidth / 2) + 'px';
+      tip.style.top = (rect.top - tip.offsetHeight - 6) + 'px';
+      clearTimeout(tip._timer);
+      tip._timer = setTimeout(function(){ tip.style.display = 'none'; }, 2500);
+    });
+  });
+}
+
+// 课均收入排行
+function renderAvgRevenue(data, records) {
+  var card = document.getElementById('ov-avg-card');
+  var listEl = document.getElementById('ov-student-list');
+
+  // 全局汇总
+  var totalAmt = 0, totalHrs = 0;
+  records.forEach(function(r){
+    totalAmt += (r.amount || 0);
+    totalHrs += (r.hours || 0);
+  });
+  var globalAvg = totalHrs > 0 ? totalAmt / totalHrs : 0;
+
+  // 按学员汇总
+  var byStudent = {};
+  records.forEach(function(r){
+    var sid = r.studentId;
+    if (!byStudent[sid]) byStudent[sid] = { id: sid, name: r.studentName || '未知', amt: 0, hrs: 0, cnt: 0 };
+    byStudent[sid].amt += (r.amount || 0);
+    byStudent[sid].hrs += (r.hours || 0);
+    byStudent[sid].cnt++;
+  });
+  var arr = Object.keys(byStudent).map(function(k){ return byStudent[k]; })
+    .map(function(s){ s.avg = s.hrs > 0 ? s.amt / s.hrs : 0; return s; })
+    .sort(function(a, b){ return b.avg - a.avg; });
+
+  // 汇总卡
+  card.innerHTML =
+    '<div class="hm-title">' + svgIcon('chart') + ' 课均收入</div>' +
+    '<div class="stats-overview" style="margin:0">' +
+      '<div class="stats-card"><div class="num">¥' + fmt(globalAvg) + '</div><div class="label">整体课均收入（元/节）</div></div>' +
+      '<div class="stats-card"><div class="num">¥' + fmt(totalAmt) + '</div><div class="label">总收入</div></div>' +
+    '</div>';
+
+  // 学员排行
+  if (arr.length === 0) {
+    listEl.innerHTML = '<div class="empty-state" style="padding:40px 20px"><div class="text">暂无消课记录</div></div>';
+    return;
+  }
+  var rankCls = ['t1','t2','t3'];
+  var html = '<div class="chart-container"><div class="hm-title">' + svgIcon('people') + ' 学员课均收入排行</div>';
+  arr.forEach(function(s, i){
+    html += '<div class="ov-avg-row" onclick="openDetail(\'' + s.id + '\')">' +
+      '<div class="av-rank ' + (rankCls[i] || '') + '">' + (i + 1) + '</div>' +
+      '<div class="av-info"><div class="av-name">' + s.name + '</div>' +
+        '<div class="av-meta">' + s.cnt + '次 · ' + (+s.hrs.toFixed(1)) + '课时 · ¥' + fmt(s.amt) + '</div></div>' +
+      '<div class="av-val"><div class="v">¥' + fmt(s.avg) + '</div><div class="u">元/节</div></div>' +
+    '</div>';
+  });
+  html += '</div>';
+  listEl.innerHTML = html;
+}
+
 // ===== 统计 =====
 function loadStats(range) {
   document.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
@@ -3296,6 +3516,8 @@ function loadStats(range) {
   const map = { week: 0, month: 1, all: 2 };
   tabs[map[range]].classList.add('active');
   document.getElementById('stats-period').style.display = 'none';
+  var ovPage = document.getElementById('stats-overview-page');
+  if (ovPage) ovPage.style.display = 'none';
   document.getElementById('stats-overview').style.display = 'grid';
   const now = new Date();
   let startDate, endDate = now.toISOString().slice(0,10);
@@ -3366,7 +3588,7 @@ function loadPeriodStats(mode) {
   tabs[3].classList.add('active');
   document.getElementById('pt-week').classList.toggle('active', mode === 'week');
   document.getElementById('pt-month').classList.toggle('active', mode === 'month');
-  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty'].forEach(function(id){
+  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-overview-page'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -3453,7 +3675,7 @@ function loadCustomStats() {
   document.getElementById('pt-week').classList.remove('active');
   document.getElementById('pt-month').classList.remove('active');
   document.getElementById('pt-custom').classList.add('active');
-  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty'].forEach(function(id){
+  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-overview-page'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
