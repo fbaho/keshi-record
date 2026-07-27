@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.9';
+      var APP_VERSION = 'v4.0.10';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -246,8 +246,12 @@
     .custom-range .cr-quick .qbtn{padding:5px 12px;font-size:13px;border:none;border-radius:16px;color:var(--primary);background:var(--primary-light);cursor:pointer;white-space:nowrap;font-weight:500}
     .custom-range .cr-quick .qbtn:active{opacity:.7}
     .custom-empty{text-align:center;padding:80px 20px;color:var(--text-3);font-size:14px}
-    /* 概览：收入热力图 */
-    .hm-title{font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:5px}
+    /* 收入热力图 */
+    .hm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .hm-title{font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:5px}
+    .hm-toggle{display:flex;gap:4px;background:var(--bg-input);border-radius:8px;padding:2px}
+    .hm-tg{padding:4px 10px;font-size:12px;border-radius:6px;color:var(--text-3);cursor:pointer;font-weight:500;transition:all .2s}
+    .hm-tg.active{background:#fff;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.08)}
     .hm-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
     .hm-scroll::-webkit-scrollbar{height:4px}
     .hm-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -539,6 +543,8 @@
     </div>
     <div id="home-alerts"></div>
     <div id="home-today"></div>
+    <div class="card" id="home-heatmap-card" style="padding:16px"></div>
+    <div class="card" id="home-avg-card"></div>
     <div class="card">
       <div class="card-title"><span style="display:flex;align-items:center;gap:6px"><svg class="ico ico-sm"><use href="#icon-clock"/></svg> 最近消课记录</span><span class="more" onclick="switchPage('stats')">查看全部 →</span></div>
       <div id="home-recent"></div>
@@ -598,7 +604,6 @@
       <div class="stats-tab active" onclick="loadStats('month')">本月</div>
       <div class="stats-tab" onclick="loadStats('all')">全部</div>
       <div class="stats-tab" onclick="loadPeriodStats('month')">周期</div>
-      <div class="stats-tab" onclick="loadOverview()">概览</div>
     </div>
     <div id="stats-overview" class="stats-overview"></div>
     <div id="stats-chart" class="chart-container" style="display:none"></div>
@@ -630,11 +635,6 @@
       <div id="custom-list"></div>
       <div id="period-summary" style="margin:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
       <div id="period-list"></div>
-    </div>
-    <div id="stats-overview-page" style="display:none">
-      <div id="ov-heatmap-card" class="chart-container"></div>
-      <div id="ov-avg-card" class="chart-container"></div>
-      <div id="ov-student-list"></div>
     </div>
     <div id="stats-empty" class="empty-state" style="display:none"><div class="icon"><svg class="ico ico-xl ico-text"><use href="#icon-chart"/></svg></div><div class="text">该时间段暂无消课记录</div></div>
     <div style="padding:12px;margin-bottom:20px;display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportExcelXlsx()"><svg class="ico ico-sm"><use href="#icon-share"/></svg>导出 Excel</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportDataBackup()"><svg class="ico ico-sm"><use href="#icon-download"/></svg>备份 JSON</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="document.getElementById('import-file').click()"><svg class="ico ico-sm"><use href="#icon-upload"/></svg>导入</button><input type="file" id="import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importDataBackup(event)"></div>
@@ -2476,6 +2476,11 @@ function renderHome() {
     }
     recentEl.innerHTML = html;
   }
+  // 热力图 + 课均收入排行
+  var hmData = loadDB();
+  var hmRecords = (hmData.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
+  renderRevenueHeatmap(hmRecords, homeHeatmapRange);
+  renderAvgRevenue(hmData, hmRecords);
 }
 
 // ===== 查找学员 =====
@@ -3319,28 +3324,14 @@ function handleBatchConsume() {
   }, null, '确认补录');
 }
 
-// ===== 概览：收入热力图 + 课均收入排行 =====
-function loadOverview() {
-  document.querySelectorAll('.stats-tab').forEach(function(t){ t.classList.remove('active'); });
-  var tabs = document.querySelectorAll('.stats-tab');
-  tabs[4].classList.add('active');
-  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-period'].forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  document.getElementById('stats-overview-page').style.display = 'block';
+// ===== 首页：收入热力图 + 课均收入排行 =====
+var homeHeatmapRange = 'year';
 
-  var data = loadDB();
-  var records = (data.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
+function renderRevenueHeatmap(records, range) {
+  var card = document.getElementById('home-heatmap-card');
+  if (!card) return;
+  range = range || homeHeatmapRange || 'year';
 
-  renderRevenueHeatmap(records);
-  renderAvgRevenue(data, records);
-}
-
-// 收入热力图（GitHub 风格年度日历）
-function renderRevenueHeatmap(records) {
-  var card = document.getElementById('ov-heatmap-card');
-  // 按日期汇总金额
   var byDate = {};
   records.forEach(function(r){
     if (!byDate[r.date]) byDate[r.date] = 0;
@@ -3349,7 +3340,6 @@ function renderRevenueHeatmap(records) {
   var amounts = Object.values(byDate);
   var maxAmt = amounts.length ? Math.max.apply(null, amounts) : 0;
 
-  // 颜色分级
   function colorOf(amt) {
     if (amt <= 0) return '#ebedf0';
     var ratio = maxAmt > 0 ? amt / maxAmt : 0;
@@ -3359,27 +3349,23 @@ function renderRevenueHeatmap(records) {
     return '#0051D5';
   }
 
-  // 构建最近 365 天的日期网格
   var today = new Date();
   today.setHours(0,0,0,0);
-  // 从今天往前推到最近的周日对齐（GitHub 是从周日开始）
-  // 我们用周一为一周起点：找到 365 天前那个周一
+  var days = range === 'month' ? 30 : 365;
   var start = new Date(today);
-  start.setDate(start.getDate() - 364);
-  // 调整到周一（getDay: 0=周日, 1=周一...）
+  start.setDate(start.getDate() - (days - 1));
   var startDay = start.getDay();
   var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
   start.setDate(start.getDate() + offsetToMon);
 
-  // 计算周数
   var totalDays = Math.floor((today - start) / 86400000) + 1;
   var weeks = Math.ceil(totalDays / 7);
   if (weeks < 1) weeks = 1;
 
-  var cellSize = 11;
-  var gap = 2;
-  var leftPad = 22; // 星期标签
-  var topPad = 16;  // 月份标签
+  var cellSize = range === 'month' ? 24 : 11;
+  var gap = range === 'month' ? 4 : 2;
+  var leftPad = range === 'month' ? 28 : 22;
+  var topPad = 18;
   var svgW = leftPad + weeks * (cellSize + gap);
   var svgH = topPad + 7 * (cellSize + gap);
 
@@ -3398,20 +3384,21 @@ function renderRevenueHeatmap(records) {
     }
   }
 
-  // 构建 SVG
-  var svg = '<div class="hm-title">' + svgIcon('trending-up') + ' 收入热力图（近一年）</div>';
-  svg += '<div class="hm-scroll"><svg class="hm-svg" width="' + svgW + '" height="' + svgH + '">';
-  // 月份标签
+  var html = '<div class="hm-header">' +
+    '<div class="hm-title">' + svgIcon('trending-up') + ' 收入热力图</div>' +
+    '<div class="hm-toggle">' +
+      '<span class="hm-tg ' + (range === 'year' ? 'active' : '') + '" onclick="switchHeatmapRange(\'year\')">近一年</span>' +
+      '<span class="hm-tg ' + (range === 'month' ? 'active' : '') + '" onclick="switchHeatmapRange(\'month\')">近一月</span>' +
+    '</div></div>';
+  html += '<div class="hm-scroll"><svg class="hm-svg" width="' + svgW + '" height="' + svgH + '">';
   monthLabels.forEach(function(ml){
-    svg += '<text x="' + ml.x + '" y="11" font-size="10" fill="#999">' + ml.label + '</text>';
+    html += '<text x="' + ml.x + '" y="12" font-size="10" fill="#999">' + ml.label + '</text>';
   });
-  // 星期标签
   for (var d = 0; d < 7; d++) {
     if (dayNames[d]) {
-      svg += '<text x="0" y="' + (topPad + d * (cellSize + gap) + cellSize - 1) + '" font-size="9" fill="#999">' + dayNames[d] + '</text>';
+      html += '<text x="0" y="' + (topPad + d * (cellSize + gap) + cellSize / 2 + 3) + '" font-size="' + (range === 'month' ? 11 : 9) + '" fill="#999">' + dayNames[d] + '</text>';
     }
   }
-  // 日期格子
   for (var w = 0; w < weeks; w++) {
     for (var dd = 0; dd < 7; dd++) {
       var cellDate = new Date(start.getTime() + (w * 7 + dd) * 86400000);
@@ -3420,32 +3407,27 @@ function renderRevenueHeatmap(records) {
       var amt = byDate[dateStr] || 0;
       var x = leftPad + w * (cellSize + gap);
       var y = topPad + dd * (cellSize + gap);
-      svg += '<rect class="hm-cell" data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" rx="2" fill="' + colorOf(amt) + '" stroke="rgba(0,0,0,.04)" stroke-width=".5" style="cursor:pointer"/>';
+      html += '<rect class="hm-cell" data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" rx="3" fill="' + colorOf(amt) + '" stroke="rgba(0,0,0,.04)" stroke-width=".5" style="cursor:pointer"/>';
+      if (range === 'month') {
+        html += '<text x="' + (x + cellSize / 2) + '" y="' + (y + cellSize / 2 + 3) + '" font-size="10" fill="' + (amt > 0 ? 'rgba(255,255,255,.85)' : '#bbb') + '" text-anchor="middle" pointer-events="none">' + cellDate.getDate() + '</text>';
+      }
     }
   }
-  svg += '</svg></div>';
-  svg += '<div class="hm-legend"><span>少</span><div class="swatches">';
+  html += '</svg></div>';
+  html += '<div class="hm-legend"><span>少</span><div class="swatches">';
   ['#ebedf0','#c6e0ff','#79b8ff','#2188ff','#0051D5'].forEach(function(c){
-    svg += '<div class="sw" style="background:' + c + '"></div>';
+    html += '<div class="sw" style="background:' + c + '"></div>';
   });
-  svg += '</div><span>多</span></div>';
-  card.innerHTML = svg;
+  html += '</div><span>多</span></div>';
+  card.innerHTML = html;
 
-  // 交互：点击/触摸格子显示 tooltip
   var tip = document.getElementById('hm-tip');
-  if (!tip) {
-    tip = document.createElement('div');
-    tip.id = 'hm-tip';
-    tip.className = 'hm-tip';
-    document.body.appendChild(tip);
-  }
+  if (!tip) { tip = document.createElement('div'); tip.id = 'hm-tip'; tip.className = 'hm-tip'; document.body.appendChild(tip); }
   card.querySelectorAll('.hm-cell').forEach(function(cell){
-    cell.addEventListener('click', function(e){
-      var date = this.getAttribute('data-date');
+    cell.addEventListener('click', function(){
       var amt = parseFloat(this.getAttribute('data-amt'));
-      var d = new Date(date);
-      var txt = (d.getMonth()+1) + '月' + d.getDate() + '日 · ' + (amt > 0 ? '¥' + fmt(amt) : '无收入');
-      tip.textContent = txt;
+      var d = new Date(this.getAttribute('data-date'));
+      tip.textContent = (d.getMonth()+1) + '月' + d.getDate() + '日 · ' + (amt > 0 ? '¥' + fmt(amt) : '无收入');
       tip.style.display = 'block';
       var rect = this.getBoundingClientRect();
       tip.style.left = (rect.left + rect.width / 2 - tip.offsetWidth / 2) + 'px';
@@ -3456,20 +3438,16 @@ function renderRevenueHeatmap(records) {
   });
 }
 
-// 课均收入排行
+function switchHeatmapRange(range) {
+  homeHeatmapRange = range;
+  var data = loadDB();
+  var records = (data.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
+  renderRevenueHeatmap(records, range);
+}
+
 function renderAvgRevenue(data, records) {
-  var card = document.getElementById('ov-avg-card');
-  var listEl = document.getElementById('ov-student-list');
-
-  // 全局汇总
-  var totalAmt = 0, totalHrs = 0;
-  records.forEach(function(r){
-    totalAmt += (r.amount || 0);
-    totalHrs += (r.hours || 0);
-  });
-  var globalAvg = totalHrs > 0 ? totalAmt / totalHrs : 0;
-
-  // 按学员汇总
+  var card = document.getElementById('home-avg-card');
+  if (!card) return;
   var byStudent = {};
   records.forEach(function(r){
     var sid = r.studentId;
@@ -3481,22 +3459,9 @@ function renderAvgRevenue(data, records) {
   var arr = Object.keys(byStudent).map(function(k){ return byStudent[k]; })
     .map(function(s){ s.avg = s.hrs > 0 ? s.amt / s.hrs : 0; return s; })
     .sort(function(a, b){ return b.avg - a.avg; });
-
-  // 汇总卡
-  card.innerHTML =
-    '<div class="hm-title">' + svgIcon('chart') + ' 课均收入</div>' +
-    '<div class="stats-overview" style="margin:0">' +
-      '<div class="stats-card"><div class="num">¥' + fmt(globalAvg) + '</div><div class="label">整体课均收入（元/节）</div></div>' +
-      '<div class="stats-card"><div class="num">¥' + fmt(totalAmt) + '</div><div class="label">总收入</div></div>' +
-    '</div>';
-
-  // 学员排行
-  if (arr.length === 0) {
-    listEl.innerHTML = '<div class="empty-state" style="padding:40px 20px"><div class="text">暂无消课记录</div></div>';
-    return;
-  }
+  if (arr.length === 0) { card.innerHTML = ''; return; }
   var rankCls = ['t1','t2','t3'];
-  var html = '<div class="chart-container"><div class="hm-title">' + svgIcon('people') + ' 学员课均收入排行</div>';
+  var html = '<div class="hm-title">' + svgIcon('people') + ' 课均收入排行</div>';
   arr.forEach(function(s, i){
     html += '<div class="ov-avg-row" onclick="openDetail(\'' + s.id + '\')">' +
       '<div class="av-rank ' + (rankCls[i] || '') + '">' + (i + 1) + '</div>' +
@@ -3505,8 +3470,7 @@ function renderAvgRevenue(data, records) {
       '<div class="av-val"><div class="v">¥' + fmt(s.avg) + '</div><div class="u">元/节</div></div>' +
     '</div>';
   });
-  html += '</div>';
-  listEl.innerHTML = html;
+  card.innerHTML = html;
 }
 
 // ===== 统计 =====
@@ -3516,8 +3480,6 @@ function loadStats(range) {
   const map = { week: 0, month: 1, all: 2 };
   tabs[map[range]].classList.add('active');
   document.getElementById('stats-period').style.display = 'none';
-  var ovPage = document.getElementById('stats-overview-page');
-  if (ovPage) ovPage.style.display = 'none';
   document.getElementById('stats-overview').style.display = 'grid';
   const now = new Date();
   let startDate, endDate = now.toISOString().slice(0,10);
@@ -3588,7 +3550,7 @@ function loadPeriodStats(mode) {
   tabs[3].classList.add('active');
   document.getElementById('pt-week').classList.toggle('active', mode === 'week');
   document.getElementById('pt-month').classList.toggle('active', mode === 'month');
-  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-overview-page'].forEach(function(id){
+  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -3675,7 +3637,7 @@ function loadCustomStats() {
   document.getElementById('pt-week').classList.remove('active');
   document.getElementById('pt-month').classList.remove('active');
   document.getElementById('pt-custom').classList.add('active');
-  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty','stats-overview-page'].forEach(function(id){
+  ['stats-overview','stats-chart','stats-rank','stats-detail','stats-empty'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
