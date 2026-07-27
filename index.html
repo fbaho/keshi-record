@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.10';
+      var APP_VERSION = 'v4.0.11';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -61,7 +61,7 @@
   <title>课时记录</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    :root{--primary:#007AFF;--primary-dark:#0051D5;--primary-light:#E3F0FF;--danger:#FF3B30;--danger-light:#FFEBEE;--warning:#FF9500;--warning-light:#FFF4E6;--text-1:#1C1C1E;--text-2:#8E8E93;--text-3:#AEAEB2;--bg-page:#F2F2F7;--bg-card:#fff;--bg-grouped:#F2F2F7;--bg-input:#EFEFF4;--border:#C6C6C8;--border-light:#E5E5EA;--radius:14px;--radius-sm:10px;--shadow:0 1px 3px rgba(0,0,0,.08);--shadow-card:0 2px 8px rgba(0,0,0,.06);--tab-h:58px}
+    :root{--primary:#007AFF;--primary-dark:#0051D5;--primary-light:#E3F0FF;--danger:#FF3B30;--danger-light:#FFEBEE;--warning:#FF9500;--warning-light:#FFF4E6;--text-1:#1C1C1E;--text-2:#8E8E93;--text-3:#AEAEB2;--bg-page:#F2F2F7;--bg-card:#fff;--bg-grouped:#F2F2F7;--bg-input:#EFEFF4;--border:#C6C6C8;--border-light:#E5E5EA;--radius:16px;--radius-sm:12px;--shadow:0 1px 4px rgba(0,0,0,.06);--shadow-card:0 2px 12px rgba(0,0,0,.05);--tab-h:58px}
     html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif;font-size:16px;color:var(--text-1);background:var(--bg-page);-webkit-font-smoothing:antialiased}
     #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg-page);position:relative;padding-bottom:var(--tab-h)}
     .page{display:none;min-height:100vh}.page.active{display:block;animation:fadeIn .25s ease}
@@ -94,21 +94,21 @@
     .student-card.highlight-flash{animation:flash .8s ease}
     @keyframes flash{0%{box-shadow:0 0 0 0 rgba(0,122,255,.6)}50%{box-shadow:0 0 0 8px rgba(0,122,255,.25)}100%{box-shadow:0 0 0 0 rgba(0,122,255,0)}}
     @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
-    .dashboard{background:var(--bg-card);padding:20px 16px 24px;color:var(--text-1);border-bottom:.5px solid var(--border-light)}
-    .dashboard h2{font-size:28px;font-weight:700;color:var(--text-1);margin-bottom:4px;letter-spacing:-.5px}
-    .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
-    .dashboard-item{background:var(--bg-grouped);border-radius:var(--radius-sm);padding:14px}
+    .dashboard{background:var(--bg-card);padding:24px 20px 28px;color:var(--text-1);border-bottom:.5px solid var(--border-light)}
+    .dashboard h2{font-size:30px;font-weight:700;color:var(--text-1);margin-bottom:6px;letter-spacing:-.8px}
+    .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+    .dashboard-item{background:var(--bg-grouped);border-radius:var(--radius-sm);padding:16px}
     .dashboard-item .label{font-size:13px;color:var(--text-2);margin-bottom:6px}
     .dashboard-item .value{font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--text-1)}
     .dashboard-item .unit{font-size:14px;font-weight:400;color:var(--text-3);margin-left:2px}
-    .quick-actions{display:flex;gap:10px;margin:12px}
-    .quick-btn{flex:1;background:var(--bg-card);border-radius:var(--radius);padding:14px 8px;text-align:center;box-shadow:var(--shadow-card);cursor:pointer;transition:transform .12s}
+    .quick-actions{display:flex;gap:10px;margin:16px 12px}
+    .quick-btn{flex:1;background:var(--bg-card);border-radius:var(--radius);padding:16px 8px;text-align:center;box-shadow:var(--shadow-card);cursor:pointer;transition:transform .12s}
     .quick-btn:active{transform:scale(.95)}
-    .quick-btn .icon{margin-bottom:4px;display:flex;justify-content:center}
-    .quick-btn .icon svg{width:26px;height:26px}
-    .quick-btn .text{font-size:12px;font-weight:500;color:var(--text-2)}
-    .card{background:var(--bg-card);border-radius:var(--radius);margin:12px;padding:16px;box-shadow:var(--shadow-card)}
-    .card-title{font-size:13px;color:var(--text-2);margin-bottom:10px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+    .quick-btn .icon{margin-bottom:6px;display:flex;justify-content:center}
+    .quick-btn .icon svg{width:28px;height:28px}
+    .quick-btn .text{font-size:13px;font-weight:500;color:var(--text-2)}
+    .card{background:var(--bg-card);border-radius:var(--radius);margin:12px;padding:18px;box-shadow:var(--shadow-card)}
+    .card-title{font-size:14px;color:var(--text-2);margin-bottom:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
     .card-title .more{font-size:13px;color:var(--text-3);cursor:pointer}
     .record-item{display:flex;align-items:center;padding:12px 0;border-bottom:.5px solid var(--border-light)}
     .record-item:last-child{border-bottom:none}
@@ -247,19 +247,32 @@
     .custom-range .cr-quick .qbtn:active{opacity:.7}
     .custom-empty{text-align:center;padding:80px 20px;color:var(--text-3);font-size:14px}
     /* 收入热力图 */
-    .hm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-    .hm-title{font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:5px}
-    .hm-toggle{display:flex;gap:4px;background:var(--bg-input);border-radius:8px;padding:2px}
-    .hm-tg{padding:4px 10px;font-size:12px;border-radius:6px;color:var(--text-3);cursor:pointer;font-weight:500;transition:all .2s}
-    .hm-tg.active{background:#fff;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+    .hm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .hm-title{font-size:16px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:5px;letter-spacing:-.3px}
+    .hm-toggle{display:flex;gap:2px;background:var(--bg-input);border-radius:9px;padding:2px}
+    .hm-tg{padding:5px 12px;font-size:13px;border-radius:7px;color:var(--text-3);cursor:pointer;font-weight:500;transition:all .2s}
+    .hm-tg.active{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600}
     .hm-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
     .hm-scroll::-webkit-scrollbar{height:4px}
     .hm-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
     .hm-svg{display:block}
-    .hm-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);justify-content:flex-end;margin-top:8px}
+    .hm-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);justify-content:flex-end;margin-top:10px}
     .hm-legend .swatches{display:flex;gap:2px}
-    .hm-legend .sw{width:11px;height:11px;border-radius:2px;border:.5px solid rgba(0,0,0,.06)}
-    .hm-tip{position:fixed;background:#333;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none}
+    .hm-legend .sw{width:11px;height:11px;border-radius:3px;border:.5px solid rgba(0,0,0,.06)}
+    .hm-tip{position:fixed;background:#1C1C1E;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none}
+    /* 近一月日历热力图 */
+    .hm-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+    .hm-cal-hd{text-align:center;font-size:12px;font-weight:600;color:var(--text-3);padding:4px 0}
+    .hm-cal-cell{border-radius:8px;padding:6px 4px;text-align:center;min-height:52px;display:flex;flex-direction:column;justify-content:center;transition:transform .12s}
+    .hm-cal-cell.empty{background:transparent}
+    .hm-cal-cell.has-rev{cursor:pointer}
+    .hm-cal-cell.has-rev:active{transform:scale(.94)}
+    .hm-cal-cell.today{box-shadow:0 0 0 2px var(--primary)}
+    .hm-cal-cell .hm-d{font-size:13px;font-weight:600;color:var(--text-1)}
+    .hm-cal-cell.has-rev .hm-d{color:#fff}
+    .hm-cal-cell .hm-amt{font-size:11px;font-weight:500;margin-top:2px}
+    .hm-cal-cell .hm-amt.none{color:var(--text-3);opacity:.4}
+    .hm-cal-cell.has-rev .hm-amt{color:rgba(255,255,255,.9)}
     /* 概览：课均收入排行 */
     .ov-avg-row{display:flex;align-items:center;padding:12px 0;border-bottom:.5px solid var(--border-light);cursor:pointer}
     .ov-avg-row:last-child{border-bottom:none}
@@ -599,44 +612,8 @@
   <!-- 统计页 -->
   <div id="page-stats" class="page">
     <div class="navbar">统计报表</div>
-    <div class="stats-tabs">
-      <div class="stats-tab" onclick="loadStats('week')">本周</div>
-      <div class="stats-tab active" onclick="loadStats('month')">本月</div>
-      <div class="stats-tab" onclick="loadStats('all')">全部</div>
-      <div class="stats-tab" onclick="loadPeriodStats('month')">周期</div>
-    </div>
-    <div id="stats-overview" class="stats-overview"></div>
-    <div id="stats-chart" class="chart-container" style="display:none"></div>
-    <div id="stats-rank" class="chart-container" style="display:none"></div>
-    <div id="stats-detail" class="chart-container" style="display:none"></div>
-    <div id="stats-period" style="display:none">
-      <div class="period-toggle">
-        <div class="pt-btn" id="pt-week" onclick="loadPeriodStats('week')"><svg class="ico ico-sm"><use href="#icon-calendar"/></svg> 按周</div>
-        <div class="pt-btn active" id="pt-month" onclick="loadPeriodStats('month')"><svg class="ico ico-sm"><use href="#icon-calendar"/></svg> 按月</div>
-        <div class="pt-btn" id="pt-custom" onclick="loadCustomStats()"><svg class="ico ico-sm"><use href="#icon-calendar"/></svg> 自定义</div>
-      </div>
-      <div id="custom-range-bar" class="custom-range" style="display:none">
-        <div class="cr-label">选择日期范围</div>
-        <div class="cr-inputs">
-          <input type="date" id="custom-start">
-          <span class="cr-arrow">→</span>
-          <input type="date" id="custom-end">
-        </div>
-        <div class="cr-quick">
-          <span class="qbtn" onclick="setQuickRange(7)">近7天</span>
-          <span class="qbtn" onclick="setQuickRange(30)">近30天</span>
-          <span class="qbtn" onclick="setQuickRange(90)">近90天</span>
-          <span class="qbtn" onclick="setQuickRange('thisMonth')">本月</span>
-          <span class="qbtn" onclick="setQuickRange('lastMonth')">上月</span>
-        </div>
-        <button class="cr-btn" onclick="runCustomQuery()"><svg class="ico ico-sm ico-white" style="display:inline;vertical-align:middle;margin-right:4px"><use href="#icon-search"/></svg>查询</button>
-      </div>
-      <div id="custom-summary" style="margin:0 12px 12px;display:none;grid-template-columns:1fr 1fr;gap:10px"></div>
-      <div id="custom-list"></div>
-      <div id="period-summary" style="margin:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
-      <div id="period-list"></div>
-    </div>
-    <div id="stats-empty" class="empty-state" style="display:none"><div class="icon"><svg class="ico ico-xl ico-text"><use href="#icon-chart"/></svg></div><div class="text">该时间段暂无消课记录</div></div>
+    <div id="stats-heatmap-card" class="card" style="margin:16px 12px"></div>
+    <div id="stats-avg-card" class="card" style="margin:0 12px"></div>
     <div style="padding:12px;margin-bottom:20px;display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportExcelXlsx()"><svg class="ico ico-sm"><use href="#icon-share"/></svg>导出 Excel</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportDataBackup()"><svg class="ico ico-sm"><use href="#icon-download"/></svg>备份 JSON</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="document.getElementById('import-file').click()"><svg class="ico ico-sm"><use href="#icon-upload"/></svg>导入</button><input type="file" id="import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importDataBackup(event)"></div>
   </div>
 
@@ -2415,7 +2392,7 @@ function switchPage(page) {
   if (page === 'home') renderHome();
   if (page === 'students') renderStudents();
   if (page === 'consume') renderConsume();
-  if (page === 'stats') loadStats('month');
+  if (page === 'stats') renderStatsPage();
 }
 
 // ===== 首页渲染 =====
@@ -2479,8 +2456,8 @@ function renderHome() {
   // 热力图 + 课均收入排行
   var hmData = loadDB();
   var hmRecords = (hmData.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
-  renderRevenueHeatmap(hmRecords, homeHeatmapRange);
-  renderAvgRevenue(hmData, hmRecords);
+  renderRevenueHeatmap(hmRecords, homeHeatmapRange, 'home-heatmap-card');
+  renderAvgRevenue(hmData, hmRecords, 'home-avg-card');
 }
 
 // ===== 查找学员 =====
@@ -3327,8 +3304,8 @@ function handleBatchConsume() {
 // ===== 首页：收入热力图 + 课均收入排行 =====
 var homeHeatmapRange = 'year';
 
-function renderRevenueHeatmap(records, range) {
-  var card = document.getElementById('home-heatmap-card');
+function renderRevenueHeatmap(records, range, targetId) {
+  var card = document.getElementById(targetId || 'home-heatmap-card');
   if (!card) return;
   range = range || homeHeatmapRange || 'year';
 
@@ -3341,86 +3318,126 @@ function renderRevenueHeatmap(records, range) {
   var maxAmt = amounts.length ? Math.max.apply(null, amounts) : 0;
 
   function colorOf(amt) {
-    if (amt <= 0) return '#ebedf0';
+    if (amt <= 0) return '#f0f0f5';
     var ratio = maxAmt > 0 ? amt / maxAmt : 0;
-    if (ratio < 0.25) return '#c6e0ff';
-    if (ratio < 0.5)  return '#79b8ff';
-    if (ratio < 0.75) return '#2188ff';
-    return '#0051D5';
+    if (ratio < 0.25) return '#dbeafe';
+    if (ratio < 0.5)  return '#93c5fd';
+    if (ratio < 0.75) return '#3b82f6';
+    return '#1d4ed8';
   }
 
   var today = new Date();
   today.setHours(0,0,0,0);
-  var days = range === 'month' ? 30 : 365;
-  var start = new Date(today);
-  start.setDate(start.getDate() - (days - 1));
-  var startDay = start.getDay();
-  var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
-  start.setDate(start.getDate() + offsetToMon);
 
-  var totalDays = Math.floor((today - start) / 86400000) + 1;
-  var weeks = Math.ceil(totalDays / 7);
-  if (weeks < 1) weeks = 1;
-
-  var cellSize = range === 'month' ? 24 : 11;
-  var gap = range === 'month' ? 4 : 2;
-  var leftPad = range === 'month' ? 28 : 22;
-  var topPad = 18;
-  var svgW = leftPad + weeks * (cellSize + gap);
-  var svgH = topPad + 7 * (cellSize + gap);
-
-  var dayNames = ['', '一', '', '三', '', '五', ''];
-  var monthLabels = [];
-  var lastMonth = -1;
-  for (var w = 0; w < weeks; w++) {
-    var weekStart = new Date(start.getTime() + w * 7 * 86400000);
-    var m = weekStart.getMonth();
-    if (m !== lastMonth && weekStart.getDate() <= 7) {
-      monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
-      lastMonth = m;
-    } else if (w === 0) {
-      monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
-      lastMonth = m;
-    }
-  }
-
+  // Header with toggle
   var html = '<div class="hm-header">' +
     '<div class="hm-title">' + svgIcon('trending-up') + ' 收入热力图</div>' +
     '<div class="hm-toggle">' +
       '<span class="hm-tg ' + (range === 'year' ? 'active' : '') + '" onclick="switchHeatmapRange(\'year\')">近一年</span>' +
       '<span class="hm-tg ' + (range === 'month' ? 'active' : '') + '" onclick="switchHeatmapRange(\'month\')">近一月</span>' +
     '</div></div>';
-  html += '<div class="hm-scroll"><svg class="hm-svg" width="' + svgW + '" height="' + svgH + '">';
-  monthLabels.forEach(function(ml){
-    html += '<text x="' + ml.x + '" y="12" font-size="10" fill="#999">' + ml.label + '</text>';
-  });
-  for (var d = 0; d < 7; d++) {
-    if (dayNames[d]) {
-      html += '<text x="0" y="' + (topPad + d * (cellSize + gap) + cellSize / 2 + 3) + '" font-size="' + (range === 'month' ? 11 : 9) + '" fill="#999">' + dayNames[d] + '</text>';
-    }
-  }
-  for (var w = 0; w < weeks; w++) {
-    for (var dd = 0; dd < 7; dd++) {
-      var cellDate = new Date(start.getTime() + (w * 7 + dd) * 86400000);
-      if (cellDate > today) continue;
+
+  if (range === 'month') {
+    // ===== 近一月：横向日历网格 =====
+    var days = 28; // 4周
+    var start = new Date(today);
+    start.setDate(start.getDate() - (days - 1));
+    // 调整到周一开始
+    var startDay = start.getDay();
+    var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
+    start.setDate(start.getDate() + offsetToMon);
+
+    var weekDayNames = ['一','二','三','四','五','六','日'];
+    html += '<div class="hm-cal">';
+    // 表头
+    weekDayNames.forEach(function(n){
+      html += '<div class="hm-cal-hd">' + n + '</div>';
+    });
+    // 日期格子
+    var totalCells = Math.ceil((days + Math.abs(offsetToMon)) / 7) * 7;
+    for (var i = 0; i < totalCells; i++) {
+      var cellDate = new Date(start.getTime() + i * 86400000);
+      if (cellDate > today || cellDate < new Date(today.getTime() - (days-1+6) * 86400000)) {
+        html += '<div class="hm-cal-cell empty"></div>';
+        continue;
+      }
       var dateStr = toLocalDateString(cellDate);
       var amt = byDate[dateStr] || 0;
-      var x = leftPad + w * (cellSize + gap);
-      var y = topPad + dd * (cellSize + gap);
-      html += '<rect class="hm-cell" data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" rx="3" fill="' + colorOf(amt) + '" stroke="rgba(0,0,0,.04)" stroke-width=".5" style="cursor:pointer"/>';
-      if (range === 'month') {
-        html += '<text x="' + (x + cellSize / 2) + '" y="' + (y + cellSize / 2 + 3) + '" font-size="10" fill="' + (amt > 0 ? 'rgba(255,255,255,.85)' : '#bbb') + '" text-anchor="middle" pointer-events="none">' + cellDate.getDate() + '</text>';
+      var isToday = toLocalDateString(today) === dateStr;
+      html += '<div class="hm-cal-cell' + (amt > 0 ? ' has-rev' : '') + (isToday ? ' today' : '') + '" ' +
+        'data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" style="background:' + colorOf(amt) + '">' +
+        '<div class="hm-d">' + cellDate.getDate() + '</div>' +
+        (amt > 0 ? '<div class="hm-amt">¥' + fmt(amt) + '</div>' : '<div class="hm-amt none">—</div>') +
+        '</div>';
+    }
+    html += '</div>';
+  } else {
+    // ===== 近一年：GitHub 风格竖向网格 =====
+    var days = 365;
+    var start = new Date(today);
+    start.setDate(start.getDate() - (days - 1));
+    var startDay = start.getDay();
+    var offsetToMon = startDay === 0 ? -6 : 1 - startDay;
+    start.setDate(start.getDate() + offsetToMon);
+
+    var totalDays = Math.floor((today - start) / 86400000) + 1;
+    var weeks = Math.ceil(totalDays / 7);
+    if (weeks < 1) weeks = 1;
+
+    var cellSize = 11;
+    var gap = 2;
+    var leftPad = 22;
+    var topPad = 18;
+    var svgW = leftPad + weeks * (cellSize + gap);
+    var svgH = topPad + 7 * (cellSize + gap);
+
+    var dayNames = ['', '一', '', '三', '', '五', ''];
+    var monthLabels = [];
+    var lastMonth = -1;
+    for (var w = 0; w < weeks; w++) {
+      var weekStart = new Date(start.getTime() + w * 7 * 86400000);
+      var m = weekStart.getMonth();
+      if (m !== lastMonth && weekStart.getDate() <= 7) {
+        monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
+        lastMonth = m;
+      } else if (w === 0) {
+        monthLabels.push({ x: leftPad + w * (cellSize + gap), label: (m + 1) + '月' });
+        lastMonth = m;
       }
     }
+
+    html += '<div class="hm-scroll"><svg class="hm-svg" width="' + svgW + '" height="' + svgH + '">';
+    monthLabels.forEach(function(ml){
+      html += '<text x="' + ml.x + '" y="12" font-size="10" fill="#999">' + ml.label + '</text>';
+    });
+    for (var d = 0; d < 7; d++) {
+      if (dayNames[d]) {
+        html += '<text x="0" y="' + (topPad + d * (cellSize + gap) + cellSize / 2 + 3) + '" font-size="9" fill="#999">' + dayNames[d] + '</text>';
+      }
+    }
+    for (var w = 0; w < weeks; w++) {
+      for (var dd = 0; dd < 7; dd++) {
+        var cellDate = new Date(start.getTime() + (w * 7 + dd) * 86400000);
+        if (cellDate > today) continue;
+        var dateStr = toLocalDateString(cellDate);
+        var amt = byDate[dateStr] || 0;
+        var x = leftPad + w * (cellSize + gap);
+        var y = topPad + dd * (cellSize + gap);
+        html += '<rect class="hm-cell" data-date="' + dateStr + '" data-amt="' + amt.toFixed(2) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" rx="3" fill="' + colorOf(amt) + '" stroke="rgba(0,0,0,.04)" stroke-width=".5" style="cursor:pointer"/>';
+      }
+    }
+    html += '</svg></div>';
   }
-  html += '</svg></div>';
+
+  // Legend
   html += '<div class="hm-legend"><span>少</span><div class="swatches">';
-  ['#ebedf0','#c6e0ff','#79b8ff','#2188ff','#0051D5'].forEach(function(c){
+  ['#f0f0f5','#dbeafe','#93c5fd','#3b82f6','#1d4ed8'].forEach(function(c){
     html += '<div class="sw" style="background:' + c + '"></div>';
   });
   html += '</div><span>多</span></div>';
   card.innerHTML = html;
 
+  // Tooltip for year mode cells
   var tip = document.getElementById('hm-tip');
   if (!tip) { tip = document.createElement('div'); tip.id = 'hm-tip'; tip.className = 'hm-tip'; document.body.appendChild(tip); }
   card.querySelectorAll('.hm-cell').forEach(function(cell){
@@ -3442,11 +3459,14 @@ function switchHeatmapRange(range) {
   homeHeatmapRange = range;
   var data = loadDB();
   var records = (data.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
-  renderRevenueHeatmap(records, range);
+  renderRevenueHeatmap(records, range, 'home-heatmap-card');
+  // 也刷新统计页（如果存在）
+  var statsCard = document.getElementById('stats-heatmap-card');
+  if (statsCard) renderRevenueHeatmap(records, range, 'stats-heatmap-card');
 }
 
-function renderAvgRevenue(data, records) {
-  var card = document.getElementById('home-avg-card');
+function renderAvgRevenue(data, records, targetId) {
+  var card = document.getElementById(targetId || 'home-avg-card');
   if (!card) return;
   var byStudent = {};
   records.forEach(function(r){
@@ -3471,6 +3491,14 @@ function renderAvgRevenue(data, records) {
     '</div>';
   });
   card.innerHTML = html;
+}
+
+// ===== 统计页：热力图 + 课均收入 =====
+function renderStatsPage() {
+  var data = loadDB();
+  var records = (data.records || []).filter(function(r){ return r.type !== 'adjust' && r.date && !r.isGifted; });
+  renderRevenueHeatmap(records, homeHeatmapRange || 'month', 'stats-heatmap-card');
+  renderAvgRevenue(data, records, 'stats-avg-card');
 }
 
 // ===== 统计 =====
