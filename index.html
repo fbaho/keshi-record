@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.13';
+      var APP_VERSION = 'v4.0.14';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -739,6 +739,27 @@
     <div class="form-group"><label>调整原因（选填）</label><input class="form-input" id="adj-reason" placeholder="如：升年级差价" maxlength="50"></div>
     <div id="adjust-preview" class="form-result" style="display:none"></div>
     <div style="margin-top:20px"><button class="btn btn-primary" onclick="handleAdjustAmount()">确认调整</button></div>
+  </div>
+</div>
+
+<!-- 续费弹窗 -->
+<div id="modal-renew" class="modal-mask" style="display:none" onclick="event.target===this&&closeModal('modal-renew')">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal('modal-renew')">×</div>
+    <div class="modal-title">学员续费</div>
+    <div id="renew-current-info" style="background:var(--primary-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-2);line-height:1.8"></div>
+    <div class="form-group"><label>续费金额（元）</label><input class="form-input" id="renew-amount" type="number" placeholder="如：3000" step="0.01" min="0.01" oninput="updateRenewPreview()"></div>
+    <div class="form-group"><label>续费课时（不含赠课）</label><input class="form-input" id="renew-hours" type="number" placeholder="如：20" step="0.5" min="0.5" oninput="updateRenewPreview()"></div>
+    <div class="form-group">
+      <label class="checkbox-row"><input type="checkbox" id="renew-gift" onchange="toggleRenewGift();updateRenewPreview()"> <span style="display:flex;align-items:center;gap:5px"><svg class="ico ico-sm"><use href="#icon-gift"/></svg> 赠课</span></label>
+      <div id="renew-gift-wrap" style="display:none;margin-top:8px">
+        <input class="form-input" id="renew-gift-count" type="number" placeholder="赠几节课" min="1" step="1" value="1" oninput="updateRenewPreview()">
+        <div class="form-hint">赠课不消耗金额，续费后赠课会重新分布到全部课时中</div>
+      </div>
+    </div>
+    <div class="form-group"><label>备注（选填）</label><input class="form-input" id="renew-notes" placeholder="如：续费20节、暑假班" maxlength="100"></div>
+    <div id="renew-preview" class="form-result" style="display:none"></div>
+    <div style="margin-top:20px"><button class="btn btn-primary" onclick="handleRenew()">确认续费</button></div>
   </div>
 </div>
 
@@ -2616,8 +2637,9 @@ function renderStudents() {
     const giftTag = s.giftedLessons > 0 ? '<span class="tag" style="background:var(--warning-light);color:var(--warning)">赠'+s.giftedLessons+'节</span>' : '';
     const adjustCount = (getRecords().filter(r => r.studentId === s.id && r.type === 'adjust')).length;
     const adjustedTag = adjustCount > 0 ? '<span class="tag" style="background:var(--warning-light);color:var(--warning);display:inline-flex;align-items:center;gap:3px">'+svgIcon('trending-up')+'调过价</span>' : '';
+    const renewedTag = (s.renewals && s.renewals.length > 0) ? '<span class="tag" style="background:var(--primary-light);color:var(--primary);display:inline-flex;align-items:center;gap:3px">'+svgIcon('yuan','ico-sm')+'续'+s.renewals.length+'次</span>' : '';
     const pct = s.totalHours > 0 ? (s.consumedHours / s.totalHours * 100) : 0;
-    return '<div class="student-card" onclick="openDetail(\''+s.id+'\')"><div class="header"><div class="name-wrap"><div class="avatar">'+avatar(s.name)+'</div><div class="name">'+s.name+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">'+giftTag+adjustedTag+tag+'</div></div><div style="font-size:12px;color:var(--text-3);margin:-4px 0 8px">¥'+fmt(s.perClassFee)+(adjustCount>0?' /节（新）':' /节')+'</div><div class="stats"><div class="stat-item"><div class="num green">'+s.remainingHours+'</div><div class="label">剩余课时</div></div><div class="stat-item"><div class="num orange">¥'+fmt(s.receivedAmount)+'</div><div class="label">已收（未消课）</div></div><div class="stat-item"><div class="num red">¥'+fmt(s.consumedAmount)+'</div><div class="label">已消耗</div></div></div><div class="progress-bar"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+    return '<div class="student-card" onclick="openDetail(\''+s.id+'\')"><div class="header"><div class="name-wrap"><div class="avatar">'+avatar(s.name)+'</div><div class="name">'+s.name+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">'+giftTag+adjustedTag+renewedTag+tag+'</div></div><div style="font-size:12px;color:var(--text-3);margin:-4px 0 8px">¥'+fmt(s.perClassFee)+(adjustCount>0?' /节（新）':' /节')+'</div><div class="stats"><div class="stat-item"><div class="num green">'+s.remainingHours+'</div><div class="label">剩余课时</div></div><div class="stat-item"><div class="num orange">¥'+fmt(s.receivedAmount)+'</div><div class="label">已收（未消课）</div></div><div class="stat-item"><div class="num red">¥'+fmt(s.consumedAmount)+'</div><div class="label">已消耗</div></div></div><div class="progress-bar"><div class="fill" style="width:'+pct+'%"></div></div></div>';
   }).join('');
 }
 
@@ -2716,6 +2738,13 @@ function openDetail(studentId) {
   let html = '<div class="detail-header"><div class="avatar-lg">'+avatar(s.name)+'</div><div class="name">'+s.name+'</div><div class="sub">¥'+fmt(s.perClassFee)+' /节（新单价） · 共'+s.totalHours+'课时';
   if (s.giftedLessons > 0) html += '（含'+s.giftedLessons+'节赠课）';
   html += '</div>';
+  // 续费历史摘要
+  if (s.renewals && s.renewals.length > 0) {
+    html += '<div style="margin-top:8px;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--primary);background:var(--primary-light);border-radius:6px;padding:6px 10px">'+svgIcon('yuan','ico-sm')+'续费 '+s.renewals.length+' 次：';
+    html += s.renewals.map(function(r){ return r.date.slice(5)+' ¥'+fmt(r.amount)+'/'+r.hours+'节'; }).join(' · ');
+    html += '</div>';
+  }
+  html += '</div>';
   // 调价历史摘要（直接拼到头像下方）
   const adjustForHead = records.filter(r => r.type === 'adjust');
   if (adjustForHead.length > 0) {
@@ -2812,7 +2841,21 @@ function openDetail(studentId) {
     }).join('');
     html += '</div>';
   }
-  html += '<div style="display:flex;gap:12px;margin-top:16px"><button class="btn btn-outline" style="flex:1" onclick="openEditStudent()">编辑</button><button class="btn" style="flex:1;background:var(--warning);color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:4px" onclick="openAdjustAmount()">'+svgIcon('yuan','ico-sm ico-white')+'调整金额</button><button class="btn btn-danger" style="flex:1" onclick="handleDeleteStudent()">删除学员</button></div>';
+  // 续费记录
+  const renewRecords = (s.renewals || []).slice().sort((a,b) => b.id.localeCompare(a.id));
+  if (renewRecords.length > 0) {
+    html += '<div class="card"><div class="card-title"><span style="display:flex;align-items:center;gap:5px">'+svgIcon('yuan')+' 续费记录（'+renewRecords.length+'次）</span></div>';
+    html += renewRecords.map(function(r, idx) {
+      var isLatest = idx === 0;
+      var giftStr = r.giftLessons > 0 ? ' · 赠'+r.giftLessons+'节' : '';
+      var noteStr = r.notes ? ' · '+r.notes : '';
+      var undoHtml = isLatest ? '<div class="hours" style="cursor:pointer;color:var(--danger)" onclick="handleUndoRenew(\''+r.id+'\')">撤销</div>' : '';
+      return '<div class="record-item"><div class="info"><div class="name">'+fmtDateFull(r.date)+' 续费'+noteStr+'</div><div class="meta">¥'+fmt(r.amount)+' / '+r.hours+'节 · ¥'+fmt(r.unitPrice)+'/节'+giftStr+'</div></div><div class="amount"><div class="num" style="color:var(--primary)">+¥'+fmt(r.amount)+'</div>'+undoHtml+'</div></div>';
+    }).join('');
+    html += '</div>';
+  }
+  html += '<div style="margin-top:16px"><button class="btn btn-primary" style="width:100%;margin-bottom:8px;font-size:16px;padding:14px" onclick="openRenew()">'+svgIcon('yuan','ico-sm ico-white')+' 续费</button></div>';
+  html += '<div style="display:flex;gap:12px"><button class="btn btn-outline" style="flex:1" onclick="openEditStudent()">编辑</button><button class="btn" style="flex:1;background:var(--warning);color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:4px" onclick="openAdjustAmount()">'+svgIcon('yuan','ico-sm ico-white')+'调整金额</button><button class="btn btn-danger" style="flex:1" onclick="handleDeleteStudent()">删除学员</button></div>';
   document.getElementById('detail-content').innerHTML = html;
   openModal('modal-detail');
 }
@@ -2966,6 +3009,171 @@ function handleAdjustAmount() {
   closeModal('modal-detail');
   renderHome(); renderStudents();
   showToast('单价调整成功');
+}
+
+// ===== 续费 =====
+function toggleRenewGift() {
+  var checked = document.getElementById('renew-gift').checked;
+  document.getElementById('renew-gift-wrap').style.display = checked ? 'block' : 'none';
+}
+
+function openRenew() {
+  if (!currentViewingStudent) return;
+  var s = currentViewingStudent;
+  var remPaid = Math.max(0, (s.paidHours || 0) - s.consumedHours);
+  document.getElementById('renew-current-info').innerHTML =
+    '当前信息：<br>' +
+    '单价 ¥' + fmt(s.perClassFee) + ' /节 · 剩余 ' + s.remainingHours + ' 课时（' + remPaid + '节付费 + ' + (s.giftedLessons || 0) + '节赠课）<br>' +
+    '已收（未消课）¥' + fmt(s.receivedAmount) + ' · 总金额 ¥' + fmt(s.totalAmount);
+  document.getElementById('renew-amount').value = '';
+  document.getElementById('renew-hours').value = '';
+  document.getElementById('renew-gift').checked = false;
+  document.getElementById('renew-gift-wrap').style.display = 'none';
+  document.getElementById('renew-gift-count').value = '1';
+  document.getElementById('renew-notes').value = '';
+  document.getElementById('renew-preview').style.display = 'none';
+  openModal('modal-renew');
+}
+
+function updateRenewPreview() {
+  var s = currentViewingStudent;
+  if (!s) return;
+  var amt = parseFloat(document.getElementById('renew-amount').value);
+  var hrs = parseFloat(document.getElementById('renew-hours').value);
+  var previewEl = document.getElementById('renew-preview');
+  if (!amt || amt <= 0 || !hrs || hrs <= 0) { previewEl.style.display = 'none'; return; }
+  var unitPrice = +(amt / hrs).toFixed(2);
+  var giftChecked = document.getElementById('renew-gift').checked;
+  var giftCount = giftChecked ? (parseInt(document.getElementById('renew-gift-count').value) || 0) : 0;
+  var newPaidHours = (s.paidHours || 0) + hrs;
+  var newGifted = (s.giftedLessons || 0) + giftCount;
+  var newTotalHours = newPaidHours + newGifted;
+  var newRemPaid = Math.max(0, newPaidHours - s.consumedHours);
+  var newReceived = +(newRemPaid * unitPrice).toFixed(2);
+  var newTotalAmount = +(s.consumedAmount + newReceived).toFixed(2);
+  previewEl.style.display = 'block';
+  previewEl.style.background = 'var(--primary-light)';
+  previewEl.style.color = 'var(--primary)';
+  var html = '续费预览：<br>';
+  html += '续费单价：¥' + fmt(unitPrice) + ' /节（¥' + fmt(amt) + ' ÷ ' + hrs + '节）<br>';
+  html += '新增课时：' + hrs + '节' + (giftCount > 0 ? ' + 赠' + giftCount + '节' : '') + '<br>';
+  html += '续费后总课时：' + newTotalHours + '节（剩余 ' + Math.max(0, newTotalHours - s.consumedHours) + '节）<br>';
+  if (unitPrice !== s.perClassFee) {
+    var oldRemPaid = Math.max(0, (s.paidHours || 0) - s.consumedHours);
+    var revalue = +((unitPrice - s.perClassFee) * oldRemPaid).toFixed(2);
+    html += '单价变更：¥' + fmt(s.perClassFee) + ' → ¥' + fmt(unitPrice) + ' /节<br>';
+    if (revalue > 0) html += '剩余课时重估：+¥' + fmt(revalue) + '（' + oldRemPaid + '节 × ¥' + fmt(unitPrice - s.perClassFee) + '）<br>';
+    else if (revalue < 0) html += '剩余课时重估：-¥' + fmt(Math.abs(revalue)) + '（' + oldRemPaid + '节 × ¥' + fmt(unitPrice - s.perClassFee) + '）<br>';
+  }
+  html += '续费后已收：¥' + fmt(newReceived) + '（原 ¥' + fmt(s.receivedAmount) + '）<br>';
+  html += '续费后总金额：¥' + fmt(newTotalAmount) + '（原 ¥' + fmt(s.totalAmount) + '）';
+  previewEl.innerHTML = html;
+}
+
+function handleRenew() {
+  if (!currentViewingStudent) return;
+  var s = currentViewingStudent;
+  var amt = parseFloat(document.getElementById('renew-amount').value);
+  var hrs = parseFloat(document.getElementById('renew-hours').value);
+  var notes = document.getElementById('renew-notes').value.trim();
+  if (!amt || amt <= 0) { showToast('请输入续费金额'); return; }
+  if (!hrs || hrs <= 0) { showToast('请输入续费课时'); return; }
+  var giftChecked = document.getElementById('renew-gift').checked;
+  var giftCount = giftChecked ? (parseInt(document.getElementById('renew-gift-count').value) || 0) : 0;
+  var unitPrice = +(amt / hrs).toFixed(2);
+
+  var data = loadDB();
+  var student = data.students.find(st => st.id === s.id);
+  if (!student) return;
+
+  // 快照（撤销用）
+  var snapshot = {
+    oldPerClassFee: student.perClassFee,
+    oldTotalAmount: student.totalAmount,
+    oldPaidHours: student.paidHours,
+    oldGiftedLessons: student.giftedLessons || 0,
+    oldTotalHours: student.totalHours
+  };
+
+  // 更新课时
+  student.paidHours = (student.paidHours || 0) + hrs;
+  student.giftedLessons = (student.giftedLessons || 0) + giftCount;
+  student.totalHours = student.paidHours + student.giftedLessons;
+  student.perClassFee = unitPrice;
+  // 重算 totalAmount/receivedAmount（consumedAmount 不变）
+  var remPaid = Math.max(0, student.paidHours - student.consumedHours);
+  student.totalAmount = +(student.consumedAmount + remPaid * unitPrice).toFixed(2);
+  student.receivedAmount = +(student.totalAmount - student.consumedAmount).toFixed(2);
+  student.remainingHours = +(student.totalHours - student.consumedHours).toFixed(2);
+  // 重算赠课位置
+  student.giftedPositions = calcGiftedPositions(student.totalHours, student.giftedLessons);
+
+  // 存续费记录
+  if (!student.renewals) student.renewals = [];
+  student.renewals.push({
+    id: 'rn_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+    date: toLocalDateString(new Date()),
+    amount: +amt.toFixed(2),
+    hours: +hrs,
+    giftLessons: giftCount,
+    unitPrice: unitPrice,
+    notes: notes,
+    snapshot: snapshot
+  });
+
+  saveDB(data);
+  cbSync();
+
+  currentViewingStudent = data.students.find(st => st.id === s.id);
+  closeModal('modal-renew');
+  closeModal('modal-detail');
+  openDetail(s.id);
+  renderHome(); renderStudents();
+  showToast('续费成功');
+}
+
+function handleUndoRenew(renewalId) {
+  if (!currentViewingStudent) return;
+  var s = currentViewingStudent;
+  var data = loadDB();
+  var student = data.students.find(st => st.id === s.id);
+  if (!student || !student.renewals) return;
+  var renewal = student.renewals.find(r => r.id === renewalId);
+  if (!renewal) return;
+  var snap = renewal.snapshot;
+  showConfirm(
+    '确认撤销此续费？\n' +
+    '续费日期：' + renewal.date + '\n' +
+    '续费金额：¥' + fmt(renewal.amount) + ' / ' + renewal.hours + '节\n' +
+    '撤销后恢复到续费前状态：\n' +
+    '单价 ¥' + fmt(snap.oldPerClassFee) + ' /节，总金额 ¥' + fmt(snap.oldTotalAmount) + '\n' +
+    '注意：如有后续续费，请先撤销后续续费。',
+    function() {
+      // 恢复快照
+      student.perClassFee = snap.oldPerClassFee;
+      student.totalAmount = snap.oldTotalAmount;
+      student.paidHours = snap.oldPaidHours;
+      student.giftedLessons = snap.oldGiftedLessons;
+      student.totalHours = snap.oldTotalHours;
+      student.giftedPositions = calcGiftedPositions(student.totalHours, student.giftedLessons);
+      // recalc 不动 totalAmount/perClassFee，手动设 receivedAmount/remainingHours
+      student.consumedHours = student.consumedHours; // 不变
+      student.remainingHours = +(student.totalHours - student.consumedHours).toFixed(2);
+      student.receivedAmount = +(student.totalAmount - student.consumedAmount).toFixed(2);
+      // 删除续费记录
+      student.renewals = student.renewals.filter(r => r.id !== renewalId);
+      saveDB(data);
+      cbSync();
+      closeModal('modal-confirm');
+      currentViewingStudent = data.students.find(st => st.id === s.id);
+      closeModal('modal-detail');
+      openDetail(s.id);
+      renderHome(); renderStudents();
+      showToast('已撤销续费');
+    },
+    null,
+    '确认撤销'
+  );
 }
 
 // ===== 详情页消课记录批量删除 =====
