@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.14';
+      var APP_VERSION = 'v4.0.15';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -2262,6 +2262,7 @@ function addStudentDB(s) {
   };
   data.students.push(ns);
   saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   return ns;
 }
 
@@ -2293,6 +2294,7 @@ function updateStudentDB(id, updates) {
     recalcStudent(data, id);
   }
   saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   return data.students[idx];
 }
 
@@ -2301,6 +2303,7 @@ function deleteStudentDB(id) {
   data.students = data.students.filter(s => s.id !== id);
   data.records = data.records.filter(r => r.studentId !== id);
   saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
 }
 
 function addRecordsDB(consumptions) {
@@ -2325,6 +2328,8 @@ function addRecordsDB(consumptions) {
     results.push(record);
   });
   saveDB(data);
+  // 立即推送云端，避免用户立即关 App 导致推送丢失
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   return results;
 }
 
@@ -3003,6 +3008,8 @@ function handleAdjustAmount() {
   };
   data.records.push(adjustRecord);
   saveDB(data);
+  // 立即推送云端，避免用户立即关 App 导致推送丢失
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
 
   currentViewingStudent = data.students.find(st => st.id === s.id);
   closeModal('modal-adjust');
@@ -3122,7 +3129,8 @@ function handleRenew() {
   });
 
   saveDB(data);
-  cbSync();
+  // 立即推送云端，不等防抖，避免用户立即关 App 导致推送丢失
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
 
   currentViewingStudent = data.students.find(st => st.id === s.id);
   closeModal('modal-renew');
@@ -3163,7 +3171,8 @@ function handleUndoRenew(renewalId) {
       // 删除续费记录
       student.renewals = student.renewals.filter(r => r.id !== renewalId);
       saveDB(data);
-      cbSync();
+      // 立即推送云端，避免用户立即关 App 导致推送丢失
+      if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
       closeModal('modal-confirm');
       currentViewingStudent = data.students.find(st => st.id === s.id);
       closeModal('modal-detail');
@@ -3224,6 +3233,8 @@ function batchDeleteSelected() {
       data.records = data.records.filter(r => !detailBatchSelected.has(r.id));
       recalcStudent(data, studentId);
       saveDB(data);
+      // 立即推送云端，避免用户立即关 App 导致推送丢失
+      if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
       detailBatchMode = false;
       detailBatchStudentId = null;
       detailBatchSelected = new Set();
@@ -3266,6 +3277,8 @@ function handleDeleteRecord(recordId) {
         if (student) recalcStudent(data, student.id);
       }
       saveDB(data);
+      // 立即推送云端，避免用户立即关 App 导致推送丢失
+      if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
       if (currentViewingStudent) {
         currentViewingStudent = data.students.find(s => s.id === currentViewingStudent.id);
         openDetail(currentViewingStudent.id);
@@ -4176,6 +4189,7 @@ function importDataBackup(event) {
           data.students = students;
           data.records = records;
           saveDB(data);
+          if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
           renderHome(); renderStudents();
           showToast('导入成功，'+students.length+' 学员 / '+records.length+' 记录');
         });
@@ -4209,6 +4223,7 @@ function importDataBackup(event) {
         data.students = students;
         data.records = records;
         saveDB(data);
+        if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
         renderHome(); renderStudents();
         showToast('导入成功，'+students.length+' 学员 / '+records.length+' 记录');
       });
