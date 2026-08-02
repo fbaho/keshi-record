@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.20';
+      var APP_VERSION = 'v4.0.21';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -840,7 +840,7 @@
       <input class="form-input" id="tt-time" type="time" placeholder="如 14:00">
     </div>
     <div class="form-group">
-      <label>上课学员</label>
+      <label>上课学员 <span style="font-size:12px;color:var(--text-3);font-weight:400">（可多选）</span></label>
       <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
       <div>
         <button type="button" class="btn btn-outline tt-ext-btn" style="width:100%;padding:10px 14px;margin-bottom:8px" onclick="toggleExternalStudent(event)">外部学生</button>
@@ -2326,7 +2326,7 @@ function skipAutoDeduct() {
 // ===== 周课表功能 =====
 let ttWeekOffset = 0; // 0=本周, -1=上周, 1=下周
 let ttSelectedDay = 1; // 默认周一
-let ttSelectedStudentId = null; // null=外部学生
+let ttSelectedStudentIds = []; // 多选学员，空数组=未选
 let ttIsExternal = false;
 
 function getWeekDates(offset) {
@@ -2508,7 +2508,7 @@ function openAddTimetableEntry() {
   document.getElementById('tt-student-list').innerHTML = listHtml;
 
   // 重置状态
-  ttSelectedStudentId = null;
+  ttSelectedStudentIds = [];
   ttIsExternal = false;
   document.getElementById('tt-ext-name').value = '';
   document.getElementById('tt-ext-name').style.display = '';
@@ -2534,17 +2534,21 @@ function selectTtDay(el, dateStr) {
 }
 
 function selectTtStudent(el, studentId) {
-  // 取消之前选中的
-  document.querySelectorAll('#tt-student-list .tt-student-pick').forEach(function(p) {
-    p.style.background = '';
-    var chk = p.querySelector('.tt-check');
+  // 多选：点击切换选中/取消
+  var idx = ttSelectedStudentIds.indexOf(studentId);
+  if (idx >= 0) {
+    // 已选中 → 取消
+    ttSelectedStudentIds.splice(idx, 1);
+    el.style.background = '';
+    var chk = el.querySelector('.tt-check');
     if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
-  });
-  // 选中当前
-  el.style.background = 'var(--bg-grouped)';
-  var chk = el.querySelector('.tt-check');
-  if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
-  ttSelectedStudentId = studentId;
+  } else {
+    // 未选中 → 选中
+    ttSelectedStudentIds.push(studentId);
+    el.style.background = 'var(--bg-grouped)';
+    var chk = el.querySelector('.tt-check');
+    if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
+  }
   ttIsExternal = false;
   // 清空外部输入
   document.getElementById('tt-ext-name').value = '';
@@ -2556,12 +2560,7 @@ function selectTtStudent(el, studentId) {
     ttBtn.style.borderColor = '';
     ttBtn.textContent = '外部学生';
   }
-  // 自动填入学员的 scheduleHours
-  var data = loadDB();
-  var s = data.students.find(function(st) { return st.id === studentId; });
-  if (s && s.scheduleHours) {
-    document.getElementById('tt-hours').value = s.scheduleHours;
-  }
+  // 多选时不清空课时（保留用户手动输入或默认值）
 }
 
 function toggleExternalStudent(ev) {
@@ -2579,7 +2578,7 @@ function toggleExternalStudent(ev) {
       var chk = p.querySelector('.tt-check');
       if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
     });
-    ttSelectedStudentId = null;
+    ttSelectedStudentIds = [];
     extInput.focus();
     if (btn) {
       btn.style.background = 'var(--primary)';
@@ -2599,51 +2598,58 @@ function toggleExternalStudent(ev) {
 
 function handleAddTimetableEntry() {
   if (!ttSelectedDay) { showToast('请选择日期'); return; }
-  var studentName = '';
-  var studentId = null;
-  var isExternal = false;
-
-  // 优先检测外部学生输入框 —— 输入了名字即视为外部学生（避免用户忘记点"外部学生"按钮导致名字被忽略）
-  var extName = document.getElementById('tt-ext-name').value.trim();
-  if (extName) {
-    studentName = extName;
-    isExternal = true;
-  } else if (ttSelectedStudentId) {
-    var data = loadDB();
-    var s = data.students.find(function(st) { return st.id === ttSelectedStudentId; });
-    if (!s) { showToast('学员不存在'); return; }
-    studentName = s.name;
-    studentId = s.id;
-  } else {
-    showToast('请选择学员或输入外部学生'); return;
-  }
 
   var time = document.getElementById('tt-time').value || '';
   var hours = parseFloat(document.getElementById('tt-hours').value) || 1;
   if (hours < 0.5) hours = 0.5;
   var note = document.getElementById('tt-note').value.trim();
 
-  var entry = {
-    id: 'tt_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-    date: ttSelectedDay,
-    time: time,
-    studentId: studentId,
-    studentName: studentName,
-    isExternal: isExternal,
-    hours: hours,
-    note: note,
-    autoDeducted: false
-  };
+  // 收集要添加的学生列表
+  var studentsToAdd = [];
+
+  // 优先检测外部学生输入框
+  var extName = document.getElementById('tt-ext-name').value.trim();
+  if (extName) {
+    studentsToAdd.push({ name: extName, id: null, isExternal: true });
+  }
+
+  // 再加选中的 app 学员（可多选）
+  if (ttSelectedStudentIds.length > 0) {
+    var data = loadDB();
+    ttSelectedStudentIds.forEach(function(sid) {
+      var s = data.students.find(function(st) { return st.id === sid; });
+      if (s) {
+        studentsToAdd.push({ name: s.name, id: s.id, isExternal: false });
+      }
+    });
+  }
+
+  if (studentsToAdd.length === 0) {
+    showToast('请选择学员或输入外部学生'); return;
+  }
 
   var data = loadDB();
   if (!data.timetable) data.timetable = [];
-  data.timetable.push(entry);
+  var baseTs = Date.now();
+  studentsToAdd.forEach(function(stu, i) {
+    data.timetable.push({
+      id: 'tt_' + (baseTs + i) + '_' + Math.random().toString(36).slice(2,8),
+      date: ttSelectedDay,
+      time: time,
+      studentId: stu.id,
+      studentName: stu.name,
+      isExternal: stu.isExternal,
+      hours: hours,
+      note: note,
+      autoDeducted: false
+    });
+  });
   saveDB(data);
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
 
   closeModal('modal-add-tt');
   renderTimetable();
-  showToast('已添加课程');
+  showToast(studentsToAdd.length > 1 ? '已添加 ' + studentsToAdd.length + ' 节课程' : '已添加课程');
 }
 
 function deleteTimetableEntry(entryId) {
