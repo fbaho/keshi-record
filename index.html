@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.16';
+      var APP_VERSION = 'v4.0.17';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -62,8 +62,8 @@
   <style>
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{--primary:#007AFF;--primary-dark:#0051D5;--primary-light:#E3F0FF;--danger:#FF3B30;--danger-light:#FFEBEE;--warning:#FF9500;--warning-light:#FFF4E6;--text-1:#1C1C1E;--text-2:#8E8E93;--text-3:#AEAEB2;--bg-page:#F2F2F7;--bg-card:#fff;--bg-grouped:#F2F2F7;--bg-input:#EFEFF4;--border:#C6C6C8;--border-light:#E5E5EA;--radius:16px;--radius-sm:12px;--shadow:0 1px 4px rgba(0,0,0,.06);--shadow-card:0 2px 12px rgba(0,0,0,.05);--tab-h:58px}
-    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif;font-size:16px;color:var(--text-1);background:var(--bg-page);-webkit-font-smoothing:antialiased}
-    #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg-page);position:relative;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom, 0px))}
+    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif;font-size:16px;color:var(--text-1);background:var(--bg-page);-webkit-font-smoothing:antialiased;overflow-x:hidden;overscroll-behavior-x:none}
+    #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg-page);position:relative;padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));overflow-x:hidden;overflow-y:visible}
     .page{display:none;min-height:100vh}.page.active{display:block;animation:fadeIn .25s ease}
     @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
     .navbar{position:sticky;top:0;z-index:100;background:rgba(248,248,250,.8);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--text-1);padding:12px 16px;text-align:center;font-size:17px;font-weight:600;letter-spacing:-.3px;border-bottom:.5px solid var(--border-light)}
@@ -374,11 +374,11 @@
     .batch-check.on::after{content:"✓";color:#fff;font-size:13px;font-weight:700;line-height:1}
 
     /* ===== 课表页 ===== */
-    .tt-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border-bottom:.5px solid var(--border-light)}
-    .tt-nav-btn{width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-grouped);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text-2);transition:all .15s}
+    .tt-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border-bottom:.5px solid var(--border-light);gap:8px}
+    .tt-nav-btn{width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-grouped);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text-2);transition:all .15s;flex-shrink:0}
     .tt-nav-btn:active{transform:scale(.9)}
-    .tt-nav-title{text-align:center}
-    .tt-nav-title .tt-range{font-size:16px;font-weight:600;color:var(--text-1)}
+    .tt-nav-title{text-align:center;flex:1;min-width:0;overflow:hidden}
+    .tt-nav-title .tt-range{font-size:16px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tt-nav-title .tt-label{font-size:12px;color:var(--text-3);margin-top:1px}
     .tt-week{padding:8px 12px 80px}
     .tt-day{background:var(--bg-card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
