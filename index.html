@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.22';
+      var APP_VERSION = 'v4.0.23';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -395,6 +395,9 @@
     .tt-grid-cell{min-height:54px;padding:4px;background:var(--bg-card);display:flex;flex-direction:column;gap:3px}
     .tt-grid-cell.is-today{background:var(--primary-light)}
     .tt-grid-cell.has-entry{background:var(--bg-card)}
+    .tt-grid-cell.is-empty{cursor:pointer;position:relative}
+    .tt-grid-cell.is-empty::after{content:"+";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-3);font-size:18px;font-weight:300;opacity:0;transition:opacity .15s}
+    .tt-grid-cell.is-empty:hover::after,.tt-grid-cell.is-empty:active::after{opacity:.55}
     .tt-cell-entry{background:var(--bg-grouped);border-radius:6px;padding:4px 5px;cursor:pointer;transition:background .15s;overflow:hidden}
     .tt-cell-entry:active{background:var(--danger);color:#fff}
     .tt-cell-name{font-size:12px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -411,6 +414,9 @@
     .tt-noslot-name{font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:4px}
     .tt-export-bar{padding:8px 16px 4px;display:flex;gap:8px}
     .tt-export-bar .btn{flex:1;font-size:14px;padding:10px}
+    /* 点格子快速添加弹窗：外部学生历史标签 */
+    .cell-recent-tag{padding:5px 12px;border-radius:14px;background:var(--bg-grouped);font-size:13px;color:var(--text-2);cursor:pointer;border:1px solid var(--border-light);transition:all .15s;-webkit-tap-highlight-color:transparent}
+    .cell-recent-tag:active{background:var(--primary);color:#fff;border-color:var(--primary)}
     /* tabbar 5 列适配 */
     .tabbar-item{flex:1}
     .batch-toolbar{display:flex;align-items:center;gap:14px;font-size:13px;margin-left:auto}
@@ -882,6 +888,29 @@
       <button class="btn btn-outline" style="flex:1" onclick="confirmCancel()">取消</button>
       <button id="confirm-ok-btn" class="btn btn-danger" style="flex:1" onclick="confirmOk()">确认删除</button>
     </div>
+  </div>
+</div>
+
+<!-- 点格子快速添加课程弹窗 -->
+<div id="modal-cell-add" class="modal-mask" style="display:none" onclick="event.target===this&&closeModal('modal-cell-add')">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal('modal-cell-add')">×</div>
+    <div class="modal-title" id="cell-add-title">添加课程</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:14px;line-height:1.6" id="cell-add-subtitle"></div>
+    <div class="form-group">
+      <label>上课学员 <span style="font-size:12px;color:var(--text-3);font-weight:400">（可多选）</span></label>
+      <div id="cell-student-list" style="max-height:180px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
+      <div>
+        <input class="form-input" id="cell-ext-name" placeholder="或输入外部学生姓名，多个用逗号分隔" style="margin-bottom:8px">
+        <div id="cell-recent-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:8px"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>课时数</label>
+      <div class="schedule-hours-wrap"><span style="font-size:13px;color:var(--text-2)">每次扣</span><input class="form-input" id="cell-hours" type="number" value="1" min="0.5" step="0.5"><span style="font-size:13px;color:var(--text-2)">课时</span></div>
+    </div>
+    <div class="form-group"><label>备注（选填）</label><input class="form-input" id="cell-note" placeholder="如：补课、调课等" maxlength="50"></div>
+    <div style="margin-top:20px"><button class="btn btn-primary" onclick="handleCellAdd()">确认添加</button></div>
   </div>
 </div>
 
@@ -2442,7 +2471,10 @@ function renderTimetable() {
       var dateStr = toLocalDateString(d);
       var isToday = dateStr === todayStr;
       var cellEntries = daySlotMap[dateStr][s];
-      html += '<div class="tt-grid-cell' + (isToday ? ' is-today' : '') + (cellEntries.length > 0 ? ' has-entry' : '') + '">';
+      var isEmpty = cellEntries.length === 0;
+      var cellClass = 'tt-grid-cell' + (isToday ? ' is-today' : '') + (isEmpty ? ' is-empty' : '');
+      var cellClick = isEmpty ? ' onclick="openCellQuickAdd(\'' + dateStr + '\',' + s + ')"' : '';
+      html += '<div class="' + cellClass + '"' + cellClick + '>';
       cellEntries.forEach(function(e) {
         var extTag = e.isExternal ? '<span class="tt-cell-ext">外</span>' : '';
         var autoTag = (!e.isExternal && e.autoDeducted) ? '<span class="tt-cell-auto">✓</span>' : '';
@@ -2655,6 +2687,170 @@ function handleAddTimetableEntry() {
   showToast(studentsToAdd.length > 1 ? '已添加 ' + studentsToAdd.length + ' 节课程' : '已添加课程');
 }
 
+// ===== 点格子快速添加：日期+时段已由格子确定，不再让用户选时间 =====
+let cellSelectedDate = '';
+let cellSelectedTime = '';
+
+function openCellQuickAdd(dateStr, slotIdx) {
+  cellSelectedDate = dateStr;
+  cellSelectedTime = slotIdx >= 0 && TIME_SLOTS[slotIdx] ? TIME_SLOTS[slotIdx].time : '';
+
+  // 标题："周X M/D · 第N节 8:00-10:00"
+  var d = new Date(dateStr + 'T00:00:00');
+  var dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+  var dow = dayNames[d.getDay()];
+  var slotName = slotIdx >= 0 && TIME_SLOTS[slotIdx] ? (TIME_SLOTS[slotIdx].name + ' ' + TIME_SLOTS[slotIdx].time) : '未定时段';
+
+  document.getElementById('cell-add-title').textContent = '添加课程';
+  document.getElementById('cell-add-subtitle').innerHTML =
+    '<span style="color:var(--primary);font-weight:500">' + dow + ' ' + (d.getMonth()+1) + '/' + d.getDate() + '</span> · ' + slotName;
+
+  // 渲染 app 学员列表
+  var data = loadDB();
+  var students = data.students || [];
+  var listHtml = '';
+  students.forEach(function(s) {
+    var remain = s.remainingHours || 0;
+    var color = remain <= 0 ? 'var(--danger)' : 'var(--text-3)';
+    listHtml += '<div class="tt-student-pick" data-id="' + s.id + '" onclick="toggleCellStudent(this,\'' + s.id + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:.5px solid var(--border-light);cursor:pointer;transition:background .15s">' +
+      '<div class="avatar" style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">' + s.name.charAt(0) + '</div>' +
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;color:var(--text-1)">' + s.name + '</div>' +
+      '<div style="font-size:11px;color:' + color + '">剩' + remain + '课时</div></div>' +
+      '<div class="tt-check" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0"></div></div>';
+  });
+  if (students.length === 0) {
+    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，请在下方输入外部学生</div>';
+  }
+  document.getElementById('cell-student-list').innerHTML = listHtml;
+
+  // 重置状态
+  cellSelectedStudentIds = [];
+  document.getElementById('cell-ext-name').value = '';
+  document.getElementById('cell-hours').value = 1;
+  document.getElementById('cell-note').value = '';
+
+  // 渲染历史外部学生名字快捷标签
+  renderRecentExternalTags();
+
+  openModal('modal-cell-add');
+}
+
+let cellSelectedStudentIds = [];
+
+function toggleCellStudent(el, studentId) {
+  var idx = cellSelectedStudentIds.indexOf(studentId);
+  if (idx >= 0) {
+    cellSelectedStudentIds.splice(idx, 1);
+    el.style.background = '';
+    var chk = el.querySelector('.tt-check');
+    if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
+  } else {
+    cellSelectedStudentIds.push(studentId);
+    el.style.background = 'var(--bg-grouped)';
+    var chk = el.querySelector('.tt-check');
+    if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
+  }
+}
+
+function renderRecentExternalTags() {
+  var data = loadDB();
+  var names = (data.recentExternalNames || []).slice(0, 12);
+  var box = document.getElementById('cell-recent-tags');
+  if (names.length === 0) {
+    box.innerHTML = '';
+    return;
+  }
+  var html = '<span style="font-size:12px;color:var(--text-3);line-height:28px;margin-right:2px">常用：</span>';
+  names.forEach(function(n) {
+    html += '<span class="cell-recent-tag" onclick="appendRecentToExt(\'' + n.replace(/'/g, "\\'") + '\')">' + n + '</span>';
+  });
+  box.innerHTML = html;
+}
+
+function appendRecentToExt(name) {
+  var input = document.getElementById('cell-ext-name');
+  var cur = input.value.trim();
+  // 智能追加：避免重复
+  var parts = cur ? cur.split(/[,，、\s]+/).filter(function(x) { return x.trim(); }) : [];
+  if (parts.indexOf(name) === -1) parts.push(name);
+  input.value = parts.join(',');
+  input.focus();
+}
+
+function rememberExternalNames(rawText) {
+  if (!rawText) return;
+  var names = rawText.split(/[,，、\s]+/).map(function(n) { return n.trim(); }).filter(function(n) { return n; });
+  if (names.length === 0) return;
+  var data = loadDB();
+  var list = data.recentExternalNames || [];
+  // 新名字插到最前，去重，最多保留 30 个
+  names.forEach(function(n) {
+    var idx = list.indexOf(n);
+    if (idx >= 0) list.splice(idx, 1);
+    list.unshift(n);
+  });
+  data.recentExternalNames = list.slice(0, 30);
+  saveDB(data);
+}
+
+function handleCellAdd() {
+  var hours = parseFloat(document.getElementById('cell-hours').value) || 1;
+  if (hours < 0.5) hours = 0.5;
+  var note = document.getElementById('cell-note').value.trim();
+
+  var studentsToAdd = [];
+
+  // 外部学生输入框（支持逗号分隔）
+  var extRaw = document.getElementById('cell-ext-name').value.trim();
+  if (extRaw) {
+    var extNames = extRaw.split(/[,，、\s]+/).filter(function(n) { return n.trim(); });
+    extNames.forEach(function(n) {
+      studentsToAdd.push({ name: n.trim(), id: null, isExternal: true });
+    });
+  }
+
+  // 选中的 app 学员
+  if (cellSelectedStudentIds.length > 0) {
+    var data = loadDB();
+    cellSelectedStudentIds.forEach(function(sid) {
+      var s = data.students.find(function(st) { return st.id === sid; });
+      if (s) studentsToAdd.push({ name: s.name, id: s.id, isExternal: false });
+    });
+  }
+
+  if (studentsToAdd.length === 0) {
+    showToast('请选择学员或输入外部学生');
+    return;
+  }
+
+  var data = loadDB();
+  if (!data.timetable) data.timetable = [];
+  var baseTs = Date.now();
+  studentsToAdd.forEach(function(stu, i) {
+    data.timetable.push({
+      id: 'tt_' + (baseTs + i) + '_' + Math.random().toString(36).slice(2,8),
+      date: cellSelectedDate,
+      time: cellSelectedTime,
+      studentId: stu.id,
+      studentName: stu.name,
+      isExternal: stu.isExternal,
+      hours: hours,
+      note: note,
+      autoDeducted: false
+    });
+  });
+
+  // 记录外部学生历史
+  if (extRaw) rememberExternalNames(extRaw);
+
+  saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+
+  closeModal('modal-cell-add');
+  renderTimetable();
+  showToast(studentsToAdd.length > 1 ? '已添加 ' + studentsToAdd.length + ' 节课程' : '已添加课程');
+}
+
 function deleteTimetableEntry(entryId) {
   showConfirm('删除这节课程？', function() {
     var data = loadDB();
@@ -2815,6 +3011,7 @@ function migrateDB() {
     if (r.type === undefined) { r.type = 'consume'; changed = true; }
   });
   if (!data.timetable) { data.timetable = []; changed = true; }
+  if (!data.recentExternalNames) { data.recentExternalNames = []; changed = true; }
   if (changed) saveDB(data);
 }
 
