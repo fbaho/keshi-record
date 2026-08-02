@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.17';
+      var APP_VERSION = 'v4.0.18';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -835,7 +835,7 @@
       <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
       <div style="display:flex;align-items:center;gap:8px">
         <input class="form-input" id="tt-ext-name" placeholder="或输入外部学生姓名" style="flex:1">
-        <button class="btn btn-outline" style="flex-shrink:0;padding:10px 14px" onclick="toggleExternalStudent()">外部学生</button>
+        <button class="btn btn-outline tt-ext-btn" style="flex-shrink:0;padding:10px 14px" onclick="toggleExternalStudent(event)">外部学生</button>
       </div>
     </div>
     <div class="form-group">
@@ -2448,6 +2448,14 @@ function openAddTimetableEntry() {
   document.getElementById('tt-time').value = '';
   document.getElementById('tt-hours').value = 1;
   document.getElementById('tt-note').value = '';
+  // 重置外部学生按钮文字和样式
+  var ttBtn = document.querySelector('#modal-add-tt .tt-ext-btn');
+  if (ttBtn) {
+    ttBtn.style.background = '';
+    ttBtn.style.color = '';
+    ttBtn.style.borderColor = '';
+    ttBtn.textContent = '外部学生';
+  }
 
   openModal('modal-add-tt');
 }
@@ -2473,6 +2481,14 @@ function selectTtStudent(el, studentId) {
   ttIsExternal = false;
   // 清空外部输入
   document.getElementById('tt-ext-name').value = '';
+  // 重置外部学生按钮状态
+  var ttBtn = document.querySelector('#modal-add-tt .tt-ext-btn');
+  if (ttBtn) {
+    ttBtn.style.background = '';
+    ttBtn.style.color = '';
+    ttBtn.style.borderColor = '';
+    ttBtn.textContent = '外部学生';
+  }
   // 自动填入学员的 scheduleHours
   var data = loadDB();
   var s = data.students.find(function(st) { return st.id === studentId; });
@@ -2481,10 +2497,14 @@ function selectTtStudent(el, studentId) {
   }
 }
 
-function toggleExternalStudent() {
+function toggleExternalStudent(ev) {
   ttIsExternal = !ttIsExternal;
   var extInput = document.getElementById('tt-ext-name');
-  var btn = event.target.closest('button');
+  // 兼容 iOS PWA 里全局 event 不可用的情况：优先用传入的 ev，否则用 window.event
+  var srcEl = (ev && ev.target) ? ev.target : (window.event && window.event.target);
+  var btn = srcEl ? srcEl.closest('button') : null;
+  // 兜底：找不到按钮就按 id 找
+  if (!btn) btn = document.querySelector('#modal-add-tt .tt-ext-btn');
   if (ttIsExternal) {
     // 取消 app 学员选中
     document.querySelectorAll('#tt-student-list .tt-student-pick').forEach(function(p) {
@@ -2494,9 +2514,19 @@ function toggleExternalStudent() {
     });
     ttSelectedStudentId = null;
     extInput.focus();
-    if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--primary)'; }
+    if (btn) {
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--primary)';
+      btn.textContent = '已选外部';
+    }
   } else {
-    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+    if (btn) {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      btn.textContent = '外部学生';
+    }
   }
 }
 
@@ -2506,9 +2536,10 @@ function handleAddTimetableEntry() {
   var studentId = null;
   var isExternal = false;
 
-  if (ttIsExternal) {
-    studentName = document.getElementById('tt-ext-name').value.trim();
-    if (!studentName) { showToast('请输入外部学生姓名'); return; }
+  // 优先检测外部学生输入框 —— 输入了名字即视为外部学生（避免用户忘记点"外部学生"按钮导致名字被忽略）
+  var extName = document.getElementById('tt-ext-name').value.trim();
+  if (extName) {
+    studentName = extName;
     isExternal = true;
   } else if (ttSelectedStudentId) {
     var data = loadDB();
