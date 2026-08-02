@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.18';
+      var APP_VERSION = 'v4.0.19';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -180,7 +180,7 @@
     .ico-white{color:#fff}
     .modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end;justify-content:center;animation:maskIn .2s ease}
     @keyframes maskIn{from{opacity:0}to{opacity:1}}
-    .modal{width:100%;max-width:430px;background:var(--bg-card);border-radius:16px 16px 0 0;padding:20px 16px;animation:slideUp .3s ease;max-height:85vh;overflow-y:auto;position:relative}
+    .modal{width:100%;max-width:430px;background:var(--bg-card);border-radius:16px 16px 0 0;padding:20px 16px;animation:slideUp .3s ease;max-height:85vh;overflow-x:hidden;overflow-y:auto;position:relative;box-sizing:border-box}
     @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     .modal-title{font-size:18px;font-weight:600;text-align:center;margin-bottom:20px}
     .modal-close{position:absolute;right:16px;top:18px;font-size:22px;color:var(--text-3);cursor:pointer;line-height:1}
@@ -351,20 +351,20 @@
     .auth-card{width:100%;max-width:360px;background:var(--bg-card);border-radius:20px;padding:32px 24px;box-shadow:0 2px 20px rgba(0,0,0,.06)}
     .auth-logo{width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#007AFF,#5AC8FA);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,122,255,.3)}
     /* ===== 排课日选择 ===== */
-    .weekday-toggles{display:flex;gap:6px;margin-top:4px}
-    .weekday-toggle{flex:1;padding:10px 0;border:2px solid var(--border);border-radius:10px;background:var(--bg-card);font-size:15px;color:var(--text-2);cursor:pointer;transition:all .15s;font-weight:500;text-align:center}
+    .weekday-toggles{display:flex;gap:4px;margin-top:4px;overflow-x:hidden}
+    .weekday-toggle{flex:1 1 0;min-width:0;padding:8px 0;border:2px solid var(--border);border-radius:10px;background:var(--bg-card);font-size:14px;color:var(--text-2);cursor:pointer;transition:all .15s;font-weight:500;text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden}
     .weekday-toggle.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
     .weekday-toggle:active{transform:scale(.95)}
     .schedule-hours-wrap{display:flex;align-items:center;gap:8px;margin-top:10px}
     .schedule-hours-wrap input{width:60px!important;text-align:center}
     /* ===== 自动消课弹窗 ===== */
-    .auto-deduct-item{background:var(--bg-grouped);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px}
-    .auto-deduct-item .ai-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-    .auto-deduct-item .ai-header .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600}
-    .auto-deduct-item .ai-header .name{font-size:16px;font-weight:500}
-    .auto-deduct-item .ai-dates{font-size:13px;color:var(--text-2);line-height:1.8}
+    .auto-deduct-item{background:var(--bg-grouped);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;overflow-x:hidden;min-width:0}
+    .auto-deduct-item .ai-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+    .auto-deduct-item .ai-header .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+    .auto-deduct-item .ai-header .name{font-size:16px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .auto-deduct-item .ai-dates{font-size:13px;color:var(--text-2);line-height:1.8;word-break:break-all}
     .auto-deduct-item .ai-summary{font-size:13px;color:var(--primary);font-weight:600;margin-top:4px}
-    .auto-deduct-item .ai-dates .date-chip{display:inline-block;background:var(--bg-card);border:0.5px solid var(--border-light);border-radius:6px;padding:2px 8px;margin:2px 2px 0 0;font-size:12px;color:var(--text-2)}
+    .auto-deduct-item .ai-dates .date-chip{display:inline-block;background:var(--bg-card);border:0.5px solid var(--border-light);border-radius:6px;padding:2px 8px;margin:2px 2px 0 0;font-size:12px;color:var(--text-2);max-width:100%}
     .auto-chip{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:5px;background:var(--bg-card);border:1.5px solid var(--primary);border-radius:8px;padding:4px 9px;margin:2px 2px 0 0;font-size:12px;color:var(--text-2);transition:all .15s}
     .auto-chip .ac-box{width:15px;height:15px;border-radius:4px;background:var(--primary);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
     .auto-chip:not(.selected){opacity:.5;border-color:var(--border);text-decoration:line-through}
