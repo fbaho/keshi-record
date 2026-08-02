@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.21';
+      var APP_VERSION = 'v4.0.22';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -844,7 +844,7 @@
       <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
       <div>
         <button type="button" class="btn btn-outline tt-ext-btn" style="width:100%;padding:10px 14px;margin-bottom:8px" onclick="toggleExternalStudent(event)">外部学生</button>
-        <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名">
+        <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名，多个用逗号分隔">
       </div>
     </div>
     <div class="form-group">
@@ -2607,10 +2607,13 @@ function handleAddTimetableEntry() {
   // 收集要添加的学生列表
   var studentsToAdd = [];
 
-  // 优先检测外部学生输入框
-  var extName = document.getElementById('tt-ext-name').value.trim();
-  if (extName) {
-    studentsToAdd.push({ name: extName, id: null, isExternal: true });
+  // 优先检测外部学生输入框（支持逗号分隔多个名字）
+  var extRaw = document.getElementById('tt-ext-name').value.trim();
+  if (extRaw) {
+    var extNames = extRaw.split(/[,，、\s]+/).filter(function(n) { return n.trim(); });
+    extNames.forEach(function(n) {
+      studentsToAdd.push({ name: n.trim(), id: null, isExternal: true });
+    });
   }
 
   // 再加选中的 app 学员（可多选）
