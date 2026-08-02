@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.15';
+      var APP_VERSION = 'v4.0.16';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -372,6 +372,38 @@
     .batch-check{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-right:6px;transition:all .15s}
     .batch-check.on{background:var(--danger);border-color:var(--danger)}
     .batch-check.on::after{content:"✓";color:#fff;font-size:13px;font-weight:700;line-height:1}
+
+    /* ===== 课表页 ===== */
+    .tt-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border-bottom:.5px solid var(--border-light)}
+    .tt-nav-btn{width:36px;height:36px;border-radius:10px;border:none;background:var(--bg-grouped);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text-2);transition:all .15s}
+    .tt-nav-btn:active{transform:scale(.9)}
+    .tt-nav-title{text-align:center}
+    .tt-nav-title .tt-range{font-size:16px;font-weight:600;color:var(--text-1)}
+    .tt-nav-title .tt-label{font-size:12px;color:var(--text-3);margin-top:1px}
+    .tt-week{padding:8px 12px 80px}
+    .tt-day{background:var(--bg-card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+    .tt-day.is-today{box-shadow:0 0 0 2px var(--primary)}
+    .tt-day-hd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:.5px solid var(--border-light)}
+    .tt-day-hd .tt-dow{font-size:15px;font-weight:600;color:var(--text-1)}
+    .tt-day-hd .tt-date{font-size:13px;color:var(--text-3)}
+    .tt-day-hd .tt-badge{margin-left:auto;font-size:12px;color:var(--text-3);background:var(--bg-grouped);padding:2px 8px;border-radius:8px}
+    .tt-day.is-today .tt-dow{color:var(--primary)}
+    .tt-entries{padding:8px 14px 12px}
+    .tt-empty{font-size:13px;color:var(--text-3);padding:6px 0}
+    .tt-entry{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--border-light)}
+    .tt-entry:last-child{border-bottom:none}
+    .tt-entry .tt-time{font-size:13px;font-weight:600;color:var(--primary);min-width:48px;text-align:center}
+    .tt-entry .tt-no-time{font-size:11px;color:var(--text-3);min-width:48px;text-align:center}
+    .tt-entry .tt-info{flex:1;min-width:0}
+    .tt-entry .tt-name{font-size:15px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:5px}
+    .tt-entry .tt-ext{font-size:10px;background:var(--warning-light);color:var(--warning);padding:1px 5px;border-radius:4px;font-weight:600}
+    .tt-entry .tt-meta{font-size:12px;color:var(--text-3);margin-top:1px}
+    .tt-entry .tt-del{width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--text-3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .tt-entry .tt-del:active{background:var(--danger);color:#fff}
+    .tt-export-bar{padding:8px 16px 4px;display:flex;gap:8px}
+    .tt-export-bar .btn{flex:1;font-size:14px;padding:10px}
+    /* tabbar 5 列适配 */
+    .tabbar-item{flex:1}
     .batch-toolbar{display:flex;align-items:center;gap:14px;font-size:13px;margin-left:auto}
     .batch-toolbar .bt-btn{cursor:pointer;color:var(--primary);font-weight:500}
     .batch-toolbar .bt-btn.danger{color:var(--danger)}
@@ -627,10 +659,32 @@
     <div style="padding:12px;margin-bottom:20px;display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportExcelXlsx()"><svg class="ico ico-sm"><use href="#icon-share"/></svg>导出 Excel</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="exportDataBackup()"><svg class="ico ico-sm"><use href="#icon-download"/></svg>备份 JSON</button><button class="btn btn-outline" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px" onclick="document.getElementById('import-file').click()"><svg class="ico ico-sm"><use href="#icon-upload"/></svg>导入</button><input type="file" id="import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importDataBackup(event)"></div>
   </div>
 
+  <!-- 课表页 -->
+  <div id="page-timetable" class="page">
+    <div class="navbar white">周课表
+      <div class="nav-action" onclick="exportTimetable()" title="导出课表"><svg class="ico ico-md"><use href="#icon-share"/></svg></div>
+    </div>
+    <div class="tt-nav">
+      <button class="tt-nav-btn" onclick="navigateWeek(-1)">‹</button>
+      <div class="tt-nav-title">
+        <div class="tt-range" id="tt-range">--</div>
+        <div class="tt-label" id="tt-label">--</div>
+      </div>
+      <button class="tt-nav-btn" onclick="navigateWeek(1)">›</button>
+    </div>
+    <div class="tt-export-bar">
+      <button class="btn btn-outline" style="flex:1" onclick="goToCurrentWeek()">本周</button>
+      <button class="btn btn-outline" style="flex:1" onclick="exportTimetable()">导出课表</button>
+    </div>
+    <div class="tt-week" id="tt-week"></div>
+    <button class="fab" onclick="openAddTimetableEntry()"><svg class="ico ico-lg ico-white" style="stroke-width:2.5"><use href="#icon-plus"/></svg></button>
+  </div>
+
   <!-- 底部 Tab -->
   <div class="tabbar">
     <div class="tabbar-item active" onclick="switchPage('home')"><div class="icon"><svg class="ico"><use href="#icon-home"/></svg></div><div class="text">首页</div></div>
     <div class="tabbar-item" onclick="switchPage('students')"><div class="icon"><svg class="ico"><use href="#icon-people"/></svg></div><div class="text">学员</div></div>
+    <div class="tabbar-item" onclick="switchPage('timetable')"><div class="icon"><svg class="ico"><use href="#icon-clock"/></svg></div><div class="text">课表</div></div>
     <div class="tabbar-item" onclick="switchPage('consume')"><div class="icon"><svg class="ico"><use href="#icon-edit"/></svg></div><div class="text">消课</div></div>
     <div class="tabbar-item" onclick="switchPage('stats')"><div class="icon"><svg class="ico"><use href="#icon-chart"/></svg></div><div class="text">统计</div></div>
   </div>
@@ -763,6 +817,36 @@
   </div>
 </div>
 
+<!-- 排课弹窗 -->
+<div id="modal-add-tt" class="modal-mask" style="display:none" onclick="event.target===this&&closeModal('modal-add-tt')">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal('modal-add-tt')">×</div>
+    <div class="modal-title">添加课程</div>
+    <div class="form-group">
+      <label>日期</label>
+      <div class="weekday-toggles" id="tt-weekdays"></div>
+    </div>
+    <div class="form-group">
+      <label>时间（选填）</label>
+      <input class="form-input" id="tt-time" type="time" placeholder="如 14:00">
+    </div>
+    <div class="form-group">
+      <label>上课学员</label>
+      <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="form-input" id="tt-ext-name" placeholder="或输入外部学生姓名" style="flex:1">
+        <button class="btn btn-outline" style="flex-shrink:0;padding:10px 14px" onclick="toggleExternalStudent()">外部学生</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>课时数</label>
+      <div class="schedule-hours-wrap"><span style="font-size:13px;color:var(--text-2)">每次扣</span><input class="form-input" id="tt-hours" type="number" value="1" min="0.5" step="0.5"><span style="font-size:13px;color:var(--text-2)">课时</span></div>
+    </div>
+    <div class="form-group"><label>备注（选填）</label><input class="form-input" id="tt-note" placeholder="如：补课、调课等" maxlength="50"></div>
+    <div style="margin-top:20px"><button class="btn btn-primary" onclick="handleAddTimetableEntry()">确认添加</button></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast" class="toast" style="display:none"></div>
 
@@ -884,9 +968,23 @@ function mergeLocalAndCloud(localData, cloudData) {
     if (!localRecordIds.has(cr.id)) mergedRecords.push(cr);
   });
 
+  // timetable：按 id 并集，本地优先
+  var localTt = localData.timetable || [];
+  var cloudTt = cloudData.timetable || [];
+  var localTtIds = new Set();
+  var mergedTt = [];
+  localTt.forEach(function(e){
+    localTtIds.add(e.id);
+    mergedTt.push(e);
+  });
+  cloudTt.forEach(function(ce){
+    if (!localTtIds.has(ce.id)) mergedTt.push(ce);
+  });
+
   return {
     students: mergedStudents,
     records: mergedRecords,
+    timetable: mergedTt,
     version: cloudData.version || localData.version
   };
 }
@@ -1920,6 +2018,7 @@ function enterApp() {
   loadDB();
   renderHome();
   renderStudents();
+  renderTimetable();
   // 检查排课自动消课（延迟到 cbPullData 合并完成后执行，避免读到旧数据）
   setTimeout(checkAutoDeduct, 1500);
 }
@@ -1932,12 +2031,12 @@ function showAuthPage() {
 // ===== 数据存储（用户隔离） =====
 function loadDB() {
   var key = getUserDBKey();
-  if (!key) return { students: [], records: [], version: '2.0.0' };
+  if (!key) return { students: [], records: [], timetable: [], version: '2.0.0' };
   try {
     const raw = localStorage.getItem(key);
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { students: [], records: [], version: '2.0.0' };
+  return { students: [], records: [], timetable: [], version: '2.0.0' };
 }
 function saveDB(data) {
   var key = getUserDBKey();
@@ -2076,6 +2175,9 @@ function checkAutoDeduct() {
     }
   });
 
+  // 检查课表排课的自动消课
+  checkTimetableAutoDeduct();
+
   if (pendingAutoDeductions.length > 0) {
     showAutoDeductModal();
   }
@@ -2165,6 +2267,15 @@ function confirmAutoDeduct() {
     s.lastAutoCheckDate = today;
   });
 
+  // 标记课表排课 entries 为已消课
+  if (window._ttPendingEntries && data.timetable) {
+    window._ttPendingEntries.forEach(function(entry) {
+      var ttEntry = data.timetable.find(function(e) { return e.id === entry.id; });
+      if (ttEntry) ttEntry.autoDeducted = true;
+    });
+    window._ttPendingEntries = null;
+  }
+
   saveDB(data);
   // 立即推送云端，不等防抖，避免用户立即关 App 导致推送丢失
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
@@ -2187,12 +2298,391 @@ function skipAutoDeduct() {
       s.lastAutoCheckDate = today;
     }
   });
+  // 标记课表排课 entries 为已处理（跳过但不再提醒）
+  if (window._ttPendingEntries && data.timetable) {
+    window._ttPendingEntries.forEach(function(entry) {
+      var ttEntry = data.timetable.find(function(e) { return e.id === entry.id; });
+      if (ttEntry) ttEntry.autoDeducted = true;
+    });
+    window._ttPendingEntries = null;
+  }
   saveDB(data);
   // 立即推送云端，避免用户立即关 App 导致推送丢失
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   closeModal('modal-auto-deduct');
   pendingAutoDeductions = [];
   showToast('已跳过，可稍后手动消课');
+}
+
+// ===== 周课表功能 =====
+let ttWeekOffset = 0; // 0=本周, -1=上周, 1=下周
+let ttSelectedDay = 1; // 默认周一
+let ttSelectedStudentId = null; // null=外部学生
+let ttIsExternal = false;
+
+function getWeekDates(offset) {
+  // offset=0 本周, -1 上周, 1 下周
+  var now = new Date();
+  var day = now.getDay();
+  var diffToMon = day === 0 ? -6 : 1 - day; // 周一为起点
+  var monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMon + offset * 7);
+  var dates = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+function formatDateCN(d) {
+  return (d.getMonth()+1) + '月' + d.getDate() + '日';
+}
+
+function navigateWeek(dir) {
+  ttWeekOffset += dir;
+  renderTimetable();
+}
+
+function goToCurrentWeek() {
+  ttWeekOffset = 0;
+  renderTimetable();
+}
+
+function renderTimetable() {
+  var weekDates = getWeekDates(ttWeekOffset);
+  var mon = weekDates[0], sun = weekDates[6];
+  var rangeEl = document.getElementById('tt-range');
+  var labelEl = document.getElementById('tt-label');
+  if (rangeEl) rangeEl.textContent = formatDateCN(mon) + ' - ' + formatDateCN(sun);
+  if (labelEl) {
+    if (ttWeekOffset === 0) labelEl.textContent = '本周';
+    else if (ttWeekOffset < 0) labelEl.textContent = Math.abs(ttWeekOffset) + ' 周前';
+    else labelEl.textContent = ttWeekOffset + ' 周后';
+  }
+
+  var data = loadDB();
+  var entries = data.timetable || [];
+  var todayStr = toLocalDateString(new Date());
+  var dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+  var html = '';
+
+  for (var i = 0; i < 7; i++) {
+    var d = weekDates[i];
+    var dateStr = toLocalDateString(d);
+    var dayEntries = entries.filter(function(e) { return e.date === dateStr; });
+    dayEntries.sort(function(a,b) {
+      var ta = a.time || 'zz', tb = b.time || 'zz';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+    var isToday = dateStr === todayStr;
+    var jsDay = d.getDay();
+    var dow = dayNames[jsDay];
+
+    html += '<div class="tt-day' + (isToday ? ' is-today' : '') + '">';
+    html += '<div class="tt-day-hd"><span class="tt-dow">' + dow + '</span><span class="tt-date">' + (d.getMonth()+1) + '/' + d.getDate() + '</span>';
+    if (dayEntries.length > 0) html += '<span class="tt-badge">' + dayEntries.length + ' 节</span>';
+    html += '</div>';
+    html += '<div class="tt-entries">';
+    if (dayEntries.length === 0) {
+      html += '<div class="tt-empty">暂无安排</div>';
+    } else {
+      dayEntries.forEach(function(e) {
+        var timeHtml = e.time ? '<span class="tt-time">' + e.time + '</span>' : '<span class="tt-no-time">未定</span>';
+        var extTag = e.isExternal ? '<span class="tt-ext">外部</span>' : '';
+        var metaParts = [];
+        metaParts.push(e.hours + '课时');
+        if (e.note) metaParts.push(e.note);
+        var autoTag = '';
+        if (!e.isExternal && e.autoDeducted) autoTag = ' <span style="color:var(--success);font-size:11px">✓已消课</span>';
+        html += '<div class="tt-entry">' + timeHtml +
+          '<div class="tt-info"><div class="tt-name">' + e.studentName + extTag + autoTag + '</div>' +
+          '<div class="tt-meta">' + metaParts.join(' · ') + '</div></div>' +
+          '<button class="tt-del" onclick="deleteTimetableEntry(\'' + e.id + '\')">×</button></div>';
+      });
+    }
+    html += '</div></div>';
+  }
+
+  var weekEl = document.getElementById('tt-week');
+  if (weekEl) weekEl.innerHTML = html;
+}
+
+function openAddTimetableEntry() {
+  // 渲染本周7天选择
+  var weekDates = getWeekDates(ttWeekOffset);
+  var dayNames = ['一','二','三','四','五','六','日'];
+  var html = '';
+  for (var i = 0; i < 7; i++) {
+    var d = weekDates[i];
+    var dateStr = toLocalDateString(d);
+    html += '<button type="button" class="weekday-toggle' + (i === 0 ? ' active' : '') + '" data-date="' + dateStr + '" onclick="selectTtDay(this,\'' + dateStr + '\')">' + dayNames[i] + '<br><span style="font-size:11px;font-weight:400">' + (d.getMonth()+1) + '/' + d.getDate() + '</span></button>';
+  }
+  document.getElementById('tt-weekdays').innerHTML = html;
+  ttSelectedDay = weekDates[0] ? toLocalDateString(weekDates[0]) : '';
+
+  // 渲染 app 学员列表
+  var data = loadDB();
+  var students = data.students || [];
+  var listHtml = '';
+  students.forEach(function(s) {
+    var remain = s.remainingHours || 0;
+    var color = remain <= 0 ? 'var(--danger)' : 'var(--text-3)';
+    listHtml += '<div class="tt-student-pick" data-id="' + s.id + '" onclick="selectTtStudent(this,\'' + s.id + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:.5px solid var(--border-light);cursor:pointer;transition:background .15s">' +
+      '<div class="avatar" style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">' + s.name.charAt(0) + '</div>' +
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;color:var(--text-1)">' + s.name + '</div>' +
+      '<div style="font-size:11px;color:' + color + '">剩' + remain + '课时</div></div>' +
+      '<div class="tt-check" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0"></div></div>';
+  });
+  if (students.length === 0) {
+    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，请在下方输入外部学生</div>';
+  }
+  document.getElementById('tt-student-list').innerHTML = listHtml;
+
+  // 重置状态
+  ttSelectedStudentId = null;
+  ttIsExternal = false;
+  document.getElementById('tt-ext-name').value = '';
+  document.getElementById('tt-ext-name').style.display = '';
+  document.getElementById('tt-time').value = '';
+  document.getElementById('tt-hours').value = 1;
+  document.getElementById('tt-note').value = '';
+
+  openModal('modal-add-tt');
+}
+
+function selectTtDay(el, dateStr) {
+  document.querySelectorAll('#tt-weekdays .weekday-toggle').forEach(function(b) { b.classList.remove('active'); });
+  el.classList.add('active');
+  ttSelectedDay = dateStr;
+}
+
+function selectTtStudent(el, studentId) {
+  // 取消之前选中的
+  document.querySelectorAll('#tt-student-list .tt-student-pick').forEach(function(p) {
+    p.style.background = '';
+    var chk = p.querySelector('.tt-check');
+    if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
+  });
+  // 选中当前
+  el.style.background = 'var(--bg-grouped)';
+  var chk = el.querySelector('.tt-check');
+  if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
+  ttSelectedStudentId = studentId;
+  ttIsExternal = false;
+  // 清空外部输入
+  document.getElementById('tt-ext-name').value = '';
+  // 自动填入学员的 scheduleHours
+  var data = loadDB();
+  var s = data.students.find(function(st) { return st.id === studentId; });
+  if (s && s.scheduleHours) {
+    document.getElementById('tt-hours').value = s.scheduleHours;
+  }
+}
+
+function toggleExternalStudent() {
+  ttIsExternal = !ttIsExternal;
+  var extInput = document.getElementById('tt-ext-name');
+  var btn = event.target.closest('button');
+  if (ttIsExternal) {
+    // 取消 app 学员选中
+    document.querySelectorAll('#tt-student-list .tt-student-pick').forEach(function(p) {
+      p.style.background = '';
+      var chk = p.querySelector('.tt-check');
+      if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
+    });
+    ttSelectedStudentId = null;
+    extInput.focus();
+    if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--primary)'; }
+  } else {
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+  }
+}
+
+function handleAddTimetableEntry() {
+  if (!ttSelectedDay) { showToast('请选择日期'); return; }
+  var studentName = '';
+  var studentId = null;
+  var isExternal = false;
+
+  if (ttIsExternal) {
+    studentName = document.getElementById('tt-ext-name').value.trim();
+    if (!studentName) { showToast('请输入外部学生姓名'); return; }
+    isExternal = true;
+  } else if (ttSelectedStudentId) {
+    var data = loadDB();
+    var s = data.students.find(function(st) { return st.id === ttSelectedStudentId; });
+    if (!s) { showToast('学员不存在'); return; }
+    studentName = s.name;
+    studentId = s.id;
+  } else {
+    showToast('请选择学员或输入外部学生'); return;
+  }
+
+  var time = document.getElementById('tt-time').value || '';
+  var hours = parseFloat(document.getElementById('tt-hours').value) || 1;
+  if (hours < 0.5) hours = 0.5;
+  var note = document.getElementById('tt-note').value.trim();
+
+  var entry = {
+    id: 'tt_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+    date: ttSelectedDay,
+    time: time,
+    studentId: studentId,
+    studentName: studentName,
+    isExternal: isExternal,
+    hours: hours,
+    note: note,
+    autoDeducted: false
+  };
+
+  var data = loadDB();
+  if (!data.timetable) data.timetable = [];
+  data.timetable.push(entry);
+  saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+
+  closeModal('modal-add-tt');
+  renderTimetable();
+  showToast('已添加课程');
+}
+
+function deleteTimetableEntry(entryId) {
+  showConfirm('删除这节课程？', function() {
+    var data = loadDB();
+    data.timetable = (data.timetable || []).filter(function(e) { return e.id !== entryId; });
+    saveDB(data);
+    if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+    renderTimetable();
+    showToast('已删除');
+  });
+}
+
+function exportTimetable() {
+  var data = loadDB();
+  var entries = data.timetable || [];
+  var weekDates = getWeekDates(ttWeekOffset);
+  var mon = weekDates[0], sun = weekDates[6];
+  var dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+
+  var lines = [];
+  lines.push('📅 周课表 ' + formatDateCN(mon) + ' - ' + formatDateCN(sun));
+  lines.push('');
+
+  var hasContent = false;
+  for (var i = 0; i < 7; i++) {
+    var d = weekDates[i];
+    var dateStr = toLocalDateString(d);
+    var dayEntries = entries.filter(function(e) { return e.date === dateStr; });
+    dayEntries.sort(function(a,b) {
+      var ta = a.time || 'zz', tb = b.time || 'zz';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    });
+    var dow = dayNames[d.getDay()];
+    var header = dow + ' ' + (d.getMonth()+1) + '/' + d.getDate();
+    if (dateStr === toLocalDateString(new Date())) header += ' (今天)';
+
+    if (dayEntries.length === 0) {
+      lines.push(header);
+      lines.push('  暂无安排');
+    } else {
+      lines.push(header + ' [' + dayEntries.length + '节]');
+      dayEntries.forEach(function(e) {
+        var time = e.time || '未定';
+        var name = e.studentName + (e.isExternal ? '(外部)' : '');
+        var meta = e.hours + '课时';
+        if (e.note) meta += ' · ' + e.note;
+        lines.push('  ' + time + '  ' + name + '  ' + meta);
+      });
+    }
+    lines.push('');
+    if (dayEntries.length > 0) hasContent = true;
+  }
+
+  if (!hasContent && entries.length === 0) {
+    showToast('暂无课表数据');
+    return;
+  }
+
+  var text = lines.join('\n');
+
+  // 优先用 Web Share API
+  if (navigator.share) {
+    navigator.share({ title: '周课表', text: text }).catch(function(){});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('课表已复制到剪贴板');
+    }).catch(function() {
+      showToast('导出失败，请截图');
+    });
+  } else {
+    showToast('导出失败，请截图');
+  }
+}
+
+// ===== 课表自动消课检查（集成到 checkAutoDeduct） =====
+function checkTimetableAutoDeduct() {
+  var data = loadDB();
+  var entries = data.timetable || [];
+  var today = toLocalDateString(new Date());
+  var pending = [];
+
+  // 找到今天及之前未消课的 app 学生的排课
+  entries.forEach(function(e) {
+    if (e.isExternal || e.autoDeducted) return; // 外部学生或已消课跳过
+    if (e.date > today) return; // 未来的不处理
+    if (!e.studentId) return;
+
+    var s = data.students.find(function(st) { return st.id === e.studentId; });
+    if (!s) return;
+    if (s.remainingHours < e.hours) return; // 课时不足
+
+    // 检查是否已有该日期的消课记录
+    var hasRecord = data.records.some(function(r) {
+      return r.studentId === e.studentId && r.date === e.date && r.type !== 'adjust';
+    });
+    if (hasRecord) {
+      // 已有记录，标记为已消课
+      e.autoDeducted = true;
+      return;
+    }
+
+    pending.push({
+      entry: e,
+      student: s
+    });
+  });
+
+  if (pending.length === 0) {
+    // 即使没有待消课，也要保存 autoDeducted 更新
+    if (entries.some(function(e) { return !e.isExternal && !e.autoDeducted && e.date <= today; })) {
+      saveDB(data);
+      if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+    }
+    return;
+  }
+
+  // 构建 pendingAutoDeductions 格式，复用现有弹窗
+  pending.forEach(function(item) {
+    var existing = pendingAutoDeductions.find(function(p) { return p.student.id === item.student.id; });
+    if (existing) {
+      // 同一学员有多个排课日期，合并
+      if (existing.dates.indexOf(item.entry.date) === -1) {
+        existing.dates.push(item.entry.date);
+      }
+    } else {
+      pendingAutoDeductions.push({
+        student: item.student,
+        dates: [item.entry.date],
+        skippedDates: 0,
+        hoursPerSession: item.entry.hours
+      });
+    }
+  });
+
+  // 记录哪些 entry 对应这次自动消课，确认后标记
+  window._ttPendingEntries = pending.map(function(item) { return item.entry; });
 }
 
 // ===== 数据迁移（兼容旧数据） =====
@@ -2217,6 +2707,7 @@ function migrateDB() {
     if (r.isGifted === undefined) { r.isGifted = false; r.giftedHours = 0; changed = true; }
     if (r.type === undefined) { r.type = 'consume'; changed = true; }
   });
+  if (!data.timetable) { data.timetable = []; changed = true; }
   if (changed) saveDB(data);
 }
 
@@ -2422,11 +2913,12 @@ function switchPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   document.querySelectorAll('.tabbar-item').forEach((t,i) => {
-    const pages = ['home','students','consume','stats'];
+    const pages = ['home','students','timetable','consume','stats'];
     t.classList.toggle('active', pages[i] === page);
   });
   if (page === 'home') renderHome();
   if (page === 'students') renderStudents();
+  if (page === 'timetable') renderTimetable();
   if (page === 'consume') renderConsume();
   if (page === 'stats') renderStatsPage();
 }
@@ -4182,12 +4674,14 @@ function importDataBackup(event) {
         const imported = JSON.parse(e.target.result);
         const students = imported.students || [];
         const records = imported.records || [];
+        const timetable = imported.timetable || [];
         if (students.length === 0 && records.length === 0) { showToast('备份文件为空'); return; }
-        const msg = '确认导入此备份？\n学员：'+students.length+' 人\n记录：'+records.length+' 条\n\n提示：导入会覆盖当前数据，建议先备份再导入。';
+        const msg = '确认导入此备份？\n学员：'+students.length+' 人\n记录：'+records.length+' 条\n课表：'+timetable.length+' 条\n\n提示：导入会覆盖当前数据，建议先备份再导入。';
         showConfirm(msg, function() {
           const data = loadDB();
           data.students = students;
           data.records = records;
+          data.timetable = timetable;
           saveDB(data);
           if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
           renderHome(); renderStudents();
