@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.19';
+      var APP_VERSION = 'v4.0.20';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -380,26 +380,35 @@
     .tt-nav-title{text-align:center;flex:1;min-width:0;overflow:hidden}
     .tt-nav-title .tt-range{font-size:16px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tt-nav-title .tt-label{font-size:12px;color:var(--text-3);margin-top:1px}
-    .tt-week{padding:8px 12px 80px}
-    .tt-day{background:var(--bg-card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
-    .tt-day.is-today{box-shadow:0 0 0 2px var(--primary)}
-    .tt-day-hd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:.5px solid var(--border-light)}
-    .tt-day-hd .tt-dow{font-size:15px;font-weight:600;color:var(--text-1)}
-    .tt-day-hd .tt-date{font-size:13px;color:var(--text-3)}
-    .tt-day-hd .tt-badge{margin-left:auto;font-size:12px;color:var(--text-3);background:var(--bg-grouped);padding:2px 8px;border-radius:8px}
-    .tt-day.is-today .tt-dow{color:var(--primary)}
-    .tt-entries{padding:8px 14px 12px}
-    .tt-empty{font-size:13px;color:var(--text-3);padding:6px 0}
-    .tt-entry{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--border-light)}
-    .tt-entry:last-child{border-bottom:none}
-    .tt-entry .tt-time{font-size:13px;font-weight:600;color:var(--primary);min-width:48px;text-align:center}
-    .tt-entry .tt-no-time{font-size:11px;color:var(--text-3);min-width:48px;text-align:center}
-    .tt-entry .tt-info{flex:1;min-width:0}
-    .tt-entry .tt-name{font-size:15px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:5px}
-    .tt-entry .tt-ext{font-size:10px;background:var(--warning-light);color:var(--warning);padding:1px 5px;border-radius:4px;font-weight:600}
-    .tt-entry .tt-meta{font-size:12px;color:var(--text-3);margin-top:1px}
-    .tt-entry .tt-del{width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--text-3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .tt-entry .tt-del:active{background:var(--danger);color:#fff}
+    .tt-week{padding:8px 12px 80px;min-width:0;overflow-x:hidden}
+    .tt-grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+    .tt-grid{display:grid;grid-template-columns:64px repeat(7,minmax(78px,1fr));gap:1px;background:var(--border-light);border:1px solid var(--border-light);border-radius:10px;overflow:hidden;min-width:610px}
+    .tt-grid-corner{background:var(--bg-grouped)}
+    .tt-grid-hd{text-align:center;padding:8px 4px;background:var(--bg-card);font-size:13px;font-weight:600;color:var(--text-2)}
+    .tt-grid-hd.is-today{background:var(--primary-light);color:var(--primary)}
+    .tt-grid-hd .tt-grid-dow{font-size:13px;font-weight:600}
+    .tt-grid-hd .tt-grid-date{font-size:11px;color:var(--text-3);margin-top:2px}
+    .tt-grid-hd.is-today .tt-grid-date{color:var(--primary)}
+    .tt-grid-time{text-align:center;padding:6px 4px;background:var(--bg-grouped);display:flex;flex-direction:column;justify-content:center;align-items:center}
+    .tt-grid-time .tt-grid-slot-name{font-size:12px;font-weight:600;color:var(--text-2)}
+    .tt-grid-time .tt-grid-slot-time{font-size:10px;color:var(--text-3);margin-top:2px;white-space:nowrap}
+    .tt-grid-cell{min-height:54px;padding:4px;background:var(--bg-card);display:flex;flex-direction:column;gap:3px}
+    .tt-grid-cell.is-today{background:var(--primary-light)}
+    .tt-grid-cell.has-entry{background:var(--bg-card)}
+    .tt-cell-entry{background:var(--bg-grouped);border-radius:6px;padding:4px 5px;cursor:pointer;transition:background .15s;overflow:hidden}
+    .tt-cell-entry:active{background:var(--danger);color:#fff}
+    .tt-cell-name{font-size:12px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tt-cell-ext{font-size:9px;background:var(--warning-light);color:var(--warning);padding:0 3px;border-radius:3px;font-weight:600;flex-shrink:0}
+    .tt-cell-auto{font-size:10px;color:var(--success);flex-shrink:0}
+    .tt-cell-note{font-size:10px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tt-ext{font-size:10px;background:var(--warning-light);color:var(--warning);padding:1px 5px;border-radius:4px;font-weight:600}
+    .tt-noslot{margin-top:12px;background:var(--bg-card);border-radius:var(--radius);padding:12px 14px}
+    .tt-noslot-hd{font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:8px}
+    .tt-noslot-entry{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--border-light);cursor:pointer;font-size:13px}
+    .tt-noslot-entry:last-child{border-bottom:none}
+    .tt-noslot-entry:active{opacity:.6}
+    .tt-noslot-date{color:var(--text-3);font-size:12px;min-width:72px}
+    .tt-noslot-name{font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:4px}
     .tt-export-bar{padding:8px 16px 4px;display:flex;gap:8px}
     .tt-export-bar .btn{flex:1;font-size:14px;padding:10px}
     /* tabbar 5 列适配 */
@@ -833,9 +842,9 @@
     <div class="form-group">
       <label>上课学员</label>
       <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input class="form-input" id="tt-ext-name" placeholder="或输入外部学生姓名" style="flex:1">
-        <button class="btn btn-outline tt-ext-btn" style="flex-shrink:0;padding:10px 14px" onclick="toggleExternalStudent(event)">外部学生</button>
+      <div>
+        <button type="button" class="btn btn-outline tt-ext-btn" style="width:100%;padding:10px 14px;margin-bottom:8px" onclick="toggleExternalStudent(event)">外部学生</button>
+        <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名">
       </div>
     </div>
     <div class="form-group">
@@ -2350,6 +2359,29 @@ function goToCurrentWeek() {
   renderTimetable();
 }
 
+var TIME_SLOTS = [
+  {name: '第一节', time: '8:00-10:00'},
+  {name: '第二节', time: '10:10-12:10'},
+  {name: '第三节', time: '12:50-14:50'},
+  {name: '第四节', time: '15:00-17:00'},
+  {name: '第五节', time: '17:30-19:30'},
+  {name: '第六节', time: '19:40-21:40'}
+];
+
+function timeToSlot(time) {
+  if (!time) return -1;
+  var parts = time.split(':');
+  if (parts.length < 2) return -1;
+  var mins = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  if (isNaN(mins)) return -1;
+  if (mins < 10*60+10) return 0;
+  if (mins < 12*60+50) return 1;
+  if (mins < 15*60) return 2;
+  if (mins < 17*60+30) return 3;
+  if (mins < 19*60+40) return 4;
+  return 5;
+}
+
 function renderTimetable() {
   var weekDates = getWeekDates(ttWeekOffset);
   var mon = weekDates[0], sun = weekDates[6];
@@ -2365,44 +2397,79 @@ function renderTimetable() {
   var data = loadDB();
   var entries = data.timetable || [];
   var todayStr = toLocalDateString(new Date());
-  var dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
-  var html = '';
+  var dayNames = ['一','二','三','四','五','六','日'];
 
+  // 按日期分组，每个日期里再按时段分组
+  var daySlotMap = {};
+  weekDates.forEach(function(d) {
+    daySlotMap[toLocalDateString(d)] = [[],[],[],[],[],[]];
+  });
+  var noSlotEntries = [];
+  entries.forEach(function(e) {
+    if (!daySlotMap[e.date]) return;
+    var slot = timeToSlot(e.time);
+    if (slot >= 0) {
+      daySlotMap[e.date][slot].push(e);
+    } else {
+      noSlotEntries.push(e);
+    }
+  });
+
+  var html = '';
+  html += '<div class="tt-grid-wrap">';
+  html += '<div class="tt-grid">';
+
+  // 表头行
+  html += '<div class="tt-grid-corner"></div>';
   for (var i = 0; i < 7; i++) {
     var d = weekDates[i];
     var dateStr = toLocalDateString(d);
-    var dayEntries = entries.filter(function(e) { return e.date === dateStr; });
-    dayEntries.sort(function(a,b) {
-      var ta = a.time || 'zz', tb = b.time || 'zz';
-      return ta < tb ? -1 : ta > tb ? 1 : 0;
-    });
     var isToday = dateStr === todayStr;
-    var jsDay = d.getDay();
-    var dow = dayNames[jsDay];
-
-    html += '<div class="tt-day' + (isToday ? ' is-today' : '') + '">';
-    html += '<div class="tt-day-hd"><span class="tt-dow">' + dow + '</span><span class="tt-date">' + (d.getMonth()+1) + '/' + d.getDate() + '</span>';
-    if (dayEntries.length > 0) html += '<span class="tt-badge">' + dayEntries.length + ' 节</span>';
+    html += '<div class="tt-grid-hd' + (isToday ? ' is-today' : '') + '">';
+    html += '<div class="tt-grid-dow">周' + dayNames[i] + '</div>';
+    html += '<div class="tt-grid-date">' + (d.getMonth()+1) + '/' + d.getDate() + '</div>';
     html += '</div>';
-    html += '<div class="tt-entries">';
-    if (dayEntries.length === 0) {
-      html += '<div class="tt-empty">暂无安排</div>';
-    } else {
-      dayEntries.forEach(function(e) {
-        var timeHtml = e.time ? '<span class="tt-time">' + e.time + '</span>' : '<span class="tt-no-time">未定</span>';
-        var extTag = e.isExternal ? '<span class="tt-ext">外部</span>' : '';
-        var metaParts = [];
-        metaParts.push(e.hours + '课时');
-        if (e.note) metaParts.push(e.note);
-        var autoTag = '';
-        if (!e.isExternal && e.autoDeducted) autoTag = ' <span style="color:var(--success);font-size:11px">✓已消课</span>';
-        html += '<div class="tt-entry">' + timeHtml +
-          '<div class="tt-info"><div class="tt-name">' + e.studentName + extTag + autoTag + '</div>' +
-          '<div class="tt-meta">' + metaParts.join(' · ') + '</div></div>' +
-          '<button class="tt-del" onclick="deleteTimetableEntry(\'' + e.id + '\')">×</button></div>';
+  }
+
+  // 6 行时间段
+  for (var s = 0; s < 6; s++) {
+    html += '<div class="tt-grid-time">';
+    html += '<div class="tt-grid-slot-name">' + TIME_SLOTS[s].name + '</div>';
+    html += '<div class="tt-grid-slot-time">' + TIME_SLOTS[s].time + '</div>';
+    html += '</div>';
+    for (var i = 0; i < 7; i++) {
+      var d = weekDates[i];
+      var dateStr = toLocalDateString(d);
+      var isToday = dateStr === todayStr;
+      var cellEntries = daySlotMap[dateStr][s];
+      html += '<div class="tt-grid-cell' + (isToday ? ' is-today' : '') + (cellEntries.length > 0 ? ' has-entry' : '') + '">';
+      cellEntries.forEach(function(e) {
+        var extTag = e.isExternal ? '<span class="tt-cell-ext">外</span>' : '';
+        var autoTag = (!e.isExternal && e.autoDeducted) ? '<span class="tt-cell-auto">✓</span>' : '';
+        var noteHtml = e.note ? '<div class="tt-cell-note">' + e.note + '</div>' : '';
+        html += '<div class="tt-cell-entry" onclick="deleteTimetableEntry(\'' + e.id + '\')">';
+        html += '<div class="tt-cell-name">' + e.studentName + extTag + autoTag + '</div>';
+        html += noteHtml;
+        html += '</div>';
       });
+      html += '</div>';
     }
-    html += '</div></div>';
+  }
+
+  html += '</div></div>';
+
+  // 未定时课程
+  if (noSlotEntries.length > 0) {
+    html += '<div class="tt-noslot">';
+    html += '<div class="tt-noslot-hd">未定时 (' + noSlotEntries.length + ')</div>';
+    noSlotEntries.forEach(function(e) {
+      var extTag = e.isExternal ? '<span class="tt-ext">外部</span>' : '';
+      html += '<div class="tt-noslot-entry" onclick="deleteTimetableEntry(\'' + e.id + '\')">';
+      html += '<span class="tt-noslot-date">' + e.date + '</span> ';
+      html += '<span class="tt-noslot-name">' + e.studentName + extTag + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
   }
 
   var weekEl = document.getElementById('tt-week');
