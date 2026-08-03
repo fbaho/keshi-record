@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.23';
+      var APP_VERSION = 'v4.0.24';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -972,23 +972,25 @@ function cbPullData(uid) {
 }
 
 // 合并本地与云端数据：避免云端旧数据覆盖本地未推送的修改
-// 策略：students 按 id 取并集，冲突时 lastAutoCheckDate 较新的一边胜出
+// 策略：students 按 id 取并集，冲突时 lastModified（或回退 lastAutoCheckDate）较新的一边胜出
 //       records 按 id 取并集，本地优先（id 是唯一的，几乎不会冲突）
+//       timetable 按 id 并集，本地优先；autoDeducted 已删除的条目两边都删
 function mergeLocalAndCloud(localData, cloudData) {
   if (!cloudData || !cloudData.students) return localData;
   if (!localData || !localData.students) return cloudData;
 
-  // students：本地顺序优先，冲突时取 lastAutoCheckDate 较新的整对象
+  // students：本地顺序优先，冲突时取 lastModified 较新的整对象
   const localIds = new Set();
   const mergedStudents = [];
   localData.students.forEach(function(ls){
     localIds.add(ls.id);
     const cs = cloudData.students.find(function(c){ return c.id === ls.id; });
     if (!cs) { mergedStudents.push(ls); return; }
-    const localNew = ls.lastAutoCheckDate || '';
-    const cloudNew = cs.lastAutoCheckDate || '';
-    // 取较新的整对象（保留本地字段完整性，避免云端覆盖中间状态）
-    mergedStudents.push(localNew >= cloudNew ? ls : cs);
+    // 优先用 lastModified（精确到毫秒），回退到 lastAutoCheckDate（仅日期）
+    const localTs = ls.lastModified || ls.lastAutoCheckDate || '';
+    const cloudTs = cs.lastModified || cs.lastAutoCheckDate || '';
+    // 取较新的整对象（保留字段完整性，避免中间状态被覆盖）
+    mergedStudents.push(localTs >= cloudTs ? ls : cs);
   });
   // 云端独有学员追加到末尾
   cloudData.students.forEach(function(cs){
@@ -1023,6 +1025,7 @@ function mergeLocalAndCloud(localData, cloudData) {
     students: mergedStudents,
     records: mergedRecords,
     timetable: mergedTt,
+    recentExternalNames: cloudData.recentExternalNames || localData.recentExternalNames || [],
     version: cloudData.version || localData.version
   };
 }
@@ -1076,6 +1079,79 @@ function cbSync() {
     _cbSyncTimer = null;
   }, 800);
 }
+
+// ===== 多设备实时同步：切回 App 时 / 定时 从云端拉取最新数据 =====
+var _lastCloudUpdatedAt = 0;  // 上次同步的云端 updatedAt 时间戳
+var _cbPulling = false;        // 防止并发拉取
+
+function getLastCloudUpdatedAtKey() {
+  var phone = getCurrentUser();
+  return phone ? '__keshi_cloud_ts_' + phone : '';
+}
+
+function setLastCloudUpdatedAt(ts) {
+  _lastCloudUpdatedAt = ts;
+  var key = getLastCloudUpdatedAtKey();
+  if (key) { try { localStorage.setItem(key, String(ts)); } catch(e){} }
+}
+
+function loadLastCloudUpdatedAt() {
+  var key = getLastCloudUpdatedAtKey();
+  if (key) { try { _lastCloudUpdatedAt = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch(e){} }
+}
+
+// 统一的「拉取云端 → 合并 → 更新 UI」函数
+// 只在云端有新数据时合并，避免覆盖用户正在编辑的内容
+function cbPullAndMerge(opts) {
+  opts = opts || {};
+  if (!CB_UID || !cbUsermeta || _cbPulling) return Promise.resolve(false);
+  // 如果有弹窗打开，跳过自动拉取（避免打断用户操作）
+  if (!opts.force) {
+    var openModal = document.querySelector('.modal[style*="block"]');
+    if (openModal) return Promise.resolve(false);
+  }
+  _cbPulling = true;
+  return cbPullData(CB_UID).then(function(cloudDoc){
+    _cbPulling = false;
+    if (!cloudDoc || !cloudDoc.data) return false;
+    var cloudTs = cloudDoc.updatedAt || 0;
+    // 云端数据不比上次新 → 跳过
+    if (cloudTs <= _lastCloudUpdatedAt && !opts.force) return false;
+    var localData = loadDB();
+    var merged = mergeLocalAndCloud(localData, cloudDoc.data);
+    var phone = getCurrentUser();
+    if (phone) { try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(merged)); } catch(e){} }
+    setLastCloudUpdatedAt(cloudTs);
+    // 合并后推送到云端，让另一台设备也能同步
+    cbPushData(CB_UID, merged, getCBExtra());
+    // 刷新 UI
+    if (typeof renderHome === 'function') renderHome();
+    if (typeof renderStudents === 'function') renderStudents();
+    if (typeof renderTimetable === 'function') renderTimetable();
+    if (typeof updateMemberBadge === 'function') updateMemberBadge();
+    if (typeof renderRecentExternalTags === 'function') renderRecentExternalTags();
+    return true;
+  }).catch(function(err){
+    _cbPulling = false;
+    console.error('cbPullAndMerge:', err);
+    return false;
+  });
+}
+
+// 页面重新可见时（切回标签页 / 从后台切回 PWA）自动拉取
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden && CB_UID) {
+    // 延迟 500ms 避免 PWA 恢复时网络未就绪
+    setTimeout(function(){ cbPullAndMerge(); }, 500);
+  }
+});
+
+// 定时同步：每 60 秒检查一次云端是否有新数据
+setInterval(function(){
+  if (CB_UID && !document.hidden) {
+    cbPullAndMerge();
+  }
+}, 60000);
 
 // ===== 用户认证系统 =====
 const USERS_KEY = '__keshi_users';
@@ -1922,6 +1998,7 @@ function afterAuthSuccess(phone, isRegister) {
     if (CB_UID) {
       try { localStorage.setItem('__keshi_uid_' + phone, CB_UID); } catch(e) {}
     }
+    loadLastCloudUpdatedAt();
     return cbPullData(CB_UID);
   }).then(function(cloudDoc){
     if (cloudDoc && cloudDoc.data) {
@@ -1930,6 +2007,7 @@ function afterAuthSuccess(phone, isRegister) {
       var merged = mergeLocalAndCloud(localData, cloudDoc.data);
       try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(merged)); } catch(e) {}
       syncCloudMetaToLocal(phone, cloudDoc);
+      setLastCloudUpdatedAt(cloudDoc.updatedAt || Date.now());
       // 推送合并结果到云端，保持一致
       cbPushData(CB_UID, merged, getCBExtra());
       enterApp();
@@ -3029,6 +3107,20 @@ function recalcStudent(data, studentId) {
   });
   student.remainingHours = +(student.totalHours - student.consumedHours).toFixed(2);
   student.receivedAmount = +(student.totalAmount - student.consumedAmount).toFixed(2);
+  student.lastModified = Date.now();
+}
+
+// 计算学员已消耗的付费课时（不含赠课）
+// 注意：不能用 consumedHours 直接减，因为 consumedHours 包含赠课消耗
+function calcConsumedPaidHours(studentId) {
+  var data = loadDB();
+  var hrs = 0;
+  data.records.forEach(function(r) {
+    if (r.studentId === studentId && r.type !== 'adjust' && !r.isGifted) {
+      hrs += r.hours;
+    }
+  });
+  return +hrs.toFixed(2);
 }
 
 // ===== 学员 CRUD =====
@@ -3053,7 +3145,8 @@ function addStudentDB(s) {
     notes: s.notes || '', createdAt: new Date().toISOString(),
     schedule: s.schedule || [],
     scheduleHours: s.scheduleHours || 1,
-    lastAutoCheckDate: toLocalDateString(new Date())
+    lastAutoCheckDate: toLocalDateString(new Date()),
+    lastModified: Date.now()
   };
   data.students.push(ns);
   saveDB(data);
@@ -3088,6 +3181,8 @@ function updateStudentDB(id, updates) {
   if (updates.totalAmount !== undefined || updates.totalHours !== undefined || updates.giftedLessons !== undefined) {
     recalcStudent(data, id);
   }
+  merged.lastModified = Date.now();
+  data.students[idx] = merged;
   saveDB(data);
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
   return data.students[idx];
@@ -3120,6 +3215,7 @@ function addRecordsDB(consumptions) {
     student.remainingHours = +(student.remainingHours - hours).toFixed(2);
     student.consumedAmount = +(student.consumedAmount + calc.amount).toFixed(2);
     student.receivedAmount = +(student.receivedAmount - calc.amount).toFixed(2);
+    student.lastModified = Date.now();
     results.push(record);
   });
   saveDB(data);
@@ -3561,7 +3657,9 @@ function openDetail(studentId) {
   }
   // 详情卡片：分段展示金额明细
   const paidHours = s.paidHours || 0;
-  const remPaid = Math.max(0, paidHours - s.consumedHours);
+  // 计算已消耗的付费课时（不含赠课），用于准确计算剩余付费课时
+  const consumedPaidHours = records.filter(r => r.type !== 'adjust' && !r.isGifted).reduce((sum, r) => sum + r.hours, 0);
+  const remPaid = Math.max(0, paidHours - consumedPaidHours);
   const lastAdjust = records.filter(r => r.type === 'adjust').sort((a,b) => b.id.localeCompare(a.id))[0];
   const hasAdjust = adjustHintCount > 0;
   // 已消耗的"原价"：来自调价前的单价，即 lastAdjust.oldPerClassFee；如果没调过价，就是当前单价
@@ -3719,7 +3817,8 @@ function handleEditStudent() {
 function openAdjustAmount() {
   if (!currentViewingStudent) return;
   const s = currentViewingStudent;
-  const remPaid = Math.max(0, s.paidHours - s.consumedHours);
+  const consumedPaid = calcConsumedPaidHours(s.id);
+  const remPaid = Math.max(0, s.paidHours - consumedPaid);
   document.getElementById('adjust-current-info').innerHTML =
     '当前信息：<br>' +
     '已消耗 '+s.consumedHours+'节，金额 ¥'+fmt(s.consumedAmount)+'（按各节原价锁定不变）<br>' +
@@ -3737,7 +3836,8 @@ function updateAdjustPreview() {
   const newPrice = parseFloat(document.getElementById('adj-new-price').value);
   const previewEl = document.getElementById('adjust-preview');
   if (!newPrice || newPrice <= 0) { previewEl.style.display = 'none'; return; }
-  const remPaid = Math.max(0, s.paidHours - s.consumedHours);
+  const consumedPaid = calcConsumedPaidHours(s.id);
+  const remPaid = Math.max(0, s.paidHours - consumedPaid);
   const priceDiff = newPrice - s.perClassFee;
   const adjustTotal = +(priceDiff * remPaid).toFixed(2);
   const newTotalAmount = +(s.consumedAmount + remPaid * newPrice).toFixed(2);
@@ -3768,7 +3868,8 @@ function handleAdjustAmount() {
   const newPrice = parseFloat(document.getElementById('adj-new-price').value);
   const reason = document.getElementById('adj-reason').value.trim() || '调整单价';
   if (!newPrice || newPrice <= 0) { showToast('请输入新的单价'); return; }
-  const remPaid = Math.max(0, s.paidHours - s.consumedHours);
+  const consumedPaid = calcConsumedPaidHours(s.id);
+  const remPaid = Math.max(0, s.paidHours - consumedPaid);
   const priceDiff = newPrice - s.perClassFee;
   const adjustTotal = +(priceDiff * remPaid).toFixed(2);
   const newTotalAmount = +(s.consumedAmount + remPaid * newPrice).toFixed(2);
@@ -3823,7 +3924,8 @@ function toggleRenewGift() {
 function openRenew() {
   if (!currentViewingStudent) return;
   var s = currentViewingStudent;
-  var remPaid = Math.max(0, (s.paidHours || 0) - s.consumedHours);
+  var consumedPaid = calcConsumedPaidHours(s.id);
+  var remPaid = Math.max(0, (s.paidHours || 0) - consumedPaid);
   document.getElementById('renew-current-info').innerHTML =
     '当前信息：<br>' +
     '单价 ¥' + fmt(s.perClassFee) + ' /节 · 剩余 ' + s.remainingHours + ' 课时（' + remPaid + '节付费 + ' + (s.giftedLessons || 0) + '节赠课）<br>' +
@@ -3851,7 +3953,8 @@ function updateRenewPreview() {
   var newPaidHours = (s.paidHours || 0) + hrs;
   var newGifted = (s.giftedLessons || 0) + giftCount;
   var newTotalHours = newPaidHours + newGifted;
-  var newRemPaid = Math.max(0, newPaidHours - s.consumedHours);
+  var consumedPaid = calcConsumedPaidHours(s.id);
+  var newRemPaid = Math.max(0, newPaidHours - consumedPaid);
   var newReceived = +(newRemPaid * unitPrice).toFixed(2);
   var newTotalAmount = +(s.consumedAmount + newReceived).toFixed(2);
   previewEl.style.display = 'block';
@@ -3862,7 +3965,7 @@ function updateRenewPreview() {
   html += '新增课时：' + hrs + '节' + (giftCount > 0 ? ' + 赠' + giftCount + '节' : '') + '<br>';
   html += '续费后总课时：' + newTotalHours + '节（剩余 ' + Math.max(0, newTotalHours - s.consumedHours) + '节）<br>';
   if (unitPrice !== s.perClassFee) {
-    var oldRemPaid = Math.max(0, (s.paidHours || 0) - s.consumedHours);
+    var oldRemPaid = Math.max(0, (s.paidHours || 0) - consumedPaid);
     var revalue = +((unitPrice - s.perClassFee) * oldRemPaid).toFixed(2);
     html += '单价变更：¥' + fmt(s.perClassFee) + ' → ¥' + fmt(unitPrice) + ' /节<br>';
     if (revalue > 0) html += '剩余课时重估：+¥' + fmt(revalue) + '（' + oldRemPaid + '节 × ¥' + fmt(unitPrice - s.perClassFee) + '）<br>';
@@ -3904,10 +4007,13 @@ function handleRenew() {
   student.totalHours = student.paidHours + student.giftedLessons;
   student.perClassFee = unitPrice;
   // 重算 totalAmount/receivedAmount（consumedAmount 不变）
-  var remPaid = Math.max(0, student.paidHours - student.consumedHours);
+  // 用已消耗的付费课时（不含赠课）计算剩余付费课时
+  var consumedPaid = calcConsumedPaidHours(student.id);
+  var remPaid = Math.max(0, student.paidHours - consumedPaid);
   student.totalAmount = +(student.consumedAmount + remPaid * unitPrice).toFixed(2);
   student.receivedAmount = +(student.totalAmount - student.consumedAmount).toFixed(2);
   student.remainingHours = +(student.totalHours - student.consumedHours).toFixed(2);
+  student.lastModified = Date.now();
   // 重算赠课位置
   student.giftedPositions = calcGiftedPositions(student.totalHours, student.giftedLessons);
 
@@ -5291,6 +5397,7 @@ function parseExcelToData(wb) {
       showAuthPage();
     } else {
       CB_UID = cbUser.uid;
+      loadLastCloudUpdatedAt();
       // 后台从云端拉取最新数据（多机同步）
       cbPullData(CB_UID).then(function(cloudDoc){
         if (cloudDoc && cloudDoc.data) {
@@ -5299,6 +5406,7 @@ function parseExcelToData(wb) {
           var merged = mergeLocalAndCloud(localData, cloudDoc.data);
           try { localStorage.setItem('keshi_data_' + localPhone, JSON.stringify(merged)); } catch(e) {}
           syncCloudMetaToLocal(localPhone, cloudDoc);
+          setLastCloudUpdatedAt(cloudDoc.updatedAt || Date.now());
           // 推送合并结果到云端，保持一致
           cbPushData(CB_UID, merged, getCBExtra());
           if (typeof renderHome === 'function') renderHome();
