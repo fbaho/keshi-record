@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.24';
+      var APP_VERSION = 'v4.0.25';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -851,6 +851,7 @@
       <div>
         <button type="button" class="btn btn-outline tt-ext-btn" style="width:100%;padding:10px 14px;margin-bottom:8px" onclick="toggleExternalStudent(event)">外部学生</button>
         <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名，多个用逗号分隔">
+        <div id="tt-recent-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:8px;margin-top:6px"></div>
       </div>
     </div>
     <div class="form-group">
@@ -986,9 +987,10 @@ function mergeLocalAndCloud(localData, cloudData) {
     localIds.add(ls.id);
     const cs = cloudData.students.find(function(c){ return c.id === ls.id; });
     if (!cs) { mergedStudents.push(ls); return; }
-    // 优先用 lastModified（精确到毫秒），回退到 lastAutoCheckDate（仅日期）
-    const localTs = ls.lastModified || ls.lastAutoCheckDate || '';
-    const cloudTs = cs.lastModified || cs.lastAutoCheckDate || '';
+    // 优先用 lastModified（毫秒时间戳），回退到 lastAutoCheckDate（日期字符串）
+    // 注意：必须统一转成数字比较，否则 number >= string 时 JS 把 string 转 NaN，比较永远 false
+    const localTs = Number(ls.lastModified) || (ls.lastAutoCheckDate ? new Date(ls.lastAutoCheckDate + 'T00:00:00').getTime() : 0);
+    const cloudTs = Number(cs.lastModified) || (cs.lastAutoCheckDate ? new Date(cs.lastAutoCheckDate + 'T00:00:00').getTime() : 0);
     // 取较新的整对象（保留字段完整性，避免中间状态被覆盖）
     mergedStudents.push(localTs >= cloudTs ? ls : cs);
   });
@@ -2633,6 +2635,8 @@ function openAddTimetableEntry() {
     ttBtn.style.borderColor = '';
     ttBtn.textContent = '外部学生';
   }
+  // 渲染外部学生历史名字标签
+  renderRecentExternalTags('tt-recent-tags');
 
   openModal('modal-add-tt');
 }
@@ -2757,6 +2761,8 @@ function handleAddTimetableEntry() {
       autoDeducted: false
     });
   });
+  // 记录外部学生历史
+  if (extRaw) rememberExternalNames(extRaw);
   saveDB(data);
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
 
@@ -2830,23 +2836,28 @@ function toggleCellStudent(el, studentId) {
   }
 }
 
-function renderRecentExternalTags() {
+function renderRecentExternalTags(containerId) {
+  containerId = containerId || 'cell-recent-tags';
   var data = loadDB();
   var names = (data.recentExternalNames || []).slice(0, 12);
-  var box = document.getElementById('cell-recent-tags');
+  var box = document.getElementById(containerId);
+  if (!box) return;
   if (names.length === 0) {
     box.innerHTML = '';
     return;
   }
+  var inputId = containerId === 'tt-recent-tags' ? 'tt-ext-name' : 'cell-ext-name';
   var html = '<span style="font-size:12px;color:var(--text-3);line-height:28px;margin-right:2px">常用：</span>';
   names.forEach(function(n) {
-    html += '<span class="cell-recent-tag" onclick="appendRecentToExt(\'' + n.replace(/'/g, "\\'") + '\')">' + n + '</span>';
+    html += '<span class="cell-recent-tag" onclick="appendRecentToExt(\'' + n.replace(/'/g, "\\'") + '\',\'' + inputId + '\')">' + n + '</span>';
   });
   box.innerHTML = html;
 }
 
-function appendRecentToExt(name) {
-  var input = document.getElementById('cell-ext-name');
+function appendRecentToExt(name, inputId) {
+  inputId = inputId || 'cell-ext-name';
+  var input = document.getElementById(inputId);
+  if (!input) return;
   var cur = input.value.trim();
   // 智能追加：避免重复
   var parts = cur ? cur.split(/[,，、\s]+/).filter(function(x) { return x.trim(); }) : [];
