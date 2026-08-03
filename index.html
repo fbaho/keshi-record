@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.25';
+      var APP_VERSION = 'v4.0.26';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -574,15 +574,16 @@
       </div>
       <div class="auth-input-group">
         <span class="auth-icon"><svg><use href="#icon-lock"/></svg></span>
-        <input class="auth-input" id="auth-pwd" type="password" placeholder="密码（8-32位，含字母和数字）" maxlength="32" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='register')document.getElementById('auth-pwd2').focus();else handleAuth();}">
+        <input class="auth-input" id="auth-pwd" type="password" placeholder="密码（8-32位，含字母和数字）" maxlength="32" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='register'||authMode==='forgot')document.getElementById('auth-pwd2').focus();else handleAuth();}">
       </div>
       <div class="auth-input-group" id="auth-pwd2-group" style="display:none">
         <span class="auth-icon"><svg><use href="#icon-lock"/></svg></span>
-        <input class="auth-input" id="auth-pwd2" type="password" placeholder="确认密码" maxlength="32" autocomplete="off" onkeydown="if(event.key==='Enter')handleAuth()">
+        <input class="auth-input" id="auth-pwd2" type="password" placeholder="确认密码" maxlength="32" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='forgot')handleResetPassword();else handleAuth();}">
       </div>
       <button class="btn btn-primary" style="margin-top:8px;font-size:16px;padding:14px;border-radius:12px" id="auth-submit" onclick="handleAuth()">登 录</button>
       <div class="auth-toggle" id="auth-toggle-text">还没有账号？<a onclick="switchAuthMode('register')">注册</a></div>
       <div class="auth-hint" id="auth-hint">登录后数据云端同步，多机共用</div>
+      <div id="auth-forgot-link" style="margin-top:12px;text-align:center"><a style="font-size:13px;color:var(--primary)" onclick="switchAuthMode('forgot')">忘记密码？</a></div>
     </div>
   </div>
 <div id="app">
@@ -1889,19 +1890,44 @@ function switchAuthMode(mode) {
   var toggleText = document.getElementById('auth-toggle-text');
   var subtitle = document.getElementById('auth-subtitle');
   var hint = document.getElementById('auth-hint');
+  var forgotLink = document.getElementById('auth-forgot-link');
+  var codeBtn = document.getElementById('auth-code-btn');
   var errorEl = document.getElementById('auth-error');
   errorEl.classList.remove('show');
   if (mode === 'register') {
     codeGroup.style.display = 'flex';
     pwd2Group.style.display = 'block';
     submitBtn.textContent = '注 册';
+    submitBtn.onclick = handleAuth;
+    codeBtn.onclick = sendSmsCode;
+    codeBtn.textContent = '获取验证码';
+    codeBtn.disabled = false;
+    if (forgotLink) forgotLink.style.display = 'block';
     toggleText.innerHTML = '已有账号？<a onclick="switchAuthMode(\'login\')">登录</a>';
     subtitle.textContent = '创建账号，数据云端同步';
     if (hint) hint.textContent = '注册后可在任意设备登录使用';
+  } else if (mode === 'forgot') {
+    codeGroup.style.display = 'flex';
+    pwd2Group.style.display = 'block';
+    submitBtn.textContent = '重置密码';
+    submitBtn.onclick = handleResetPassword;
+    codeBtn.onclick = sendResetSmsCode;
+    codeBtn.textContent = '获取验证码';
+    codeBtn.disabled = false;
+    _resetUpdateUser = null;
+    if (forgotLink) forgotLink.style.display = 'none';
+    toggleText.innerHTML = '已有账号？<a onclick="switchAuthMode(\'login\')">返回登录</a>';
+    subtitle.textContent = '通过短信验证码重置密码';
+    if (hint) hint.textContent = '请输入注册时的手机号';
   } else {
     codeGroup.style.display = 'none';
     pwd2Group.style.display = 'none';
     submitBtn.textContent = '登 录';
+    submitBtn.onclick = handleAuth;
+    codeBtn.onclick = sendSmsCode;
+    codeBtn.textContent = '获取验证码';
+    codeBtn.disabled = false;
+    if (forgotLink) forgotLink.style.display = 'block';
     toggleText.innerHTML = '还没有账号？<a onclick="switchAuthMode(\'register\')">注册</a>';
     subtitle.textContent = '登录后管理你的学员课时';
     if (hint) hint.textContent = '登录后数据云端同步，多机共用';
@@ -2144,6 +2170,70 @@ function enterApp() {
 function showAuthPage() {
   document.getElementById('auth-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+  switchAuthMode('login');
+}
+
+// ===== 找回密码 =====
+var _resetUpdateUser = null;  // resetPasswordForEmail 返回的 updateUser 回调
+
+// 发送重置密码验证码
+function sendResetSmsCode() {
+  var phone = document.getElementById('auth-phone').value.trim();
+  if (!/^1[3-9]\d{9}$/.test(phone)) { showAuthError('请输入有效的手机号'); return; }
+  cbInit();
+  var btn = document.getElementById('auth-code-btn');
+  btn.disabled = true; btn.textContent = '发送中...';
+  cbAuth.resetPasswordForEmail(phone).then(function(result){
+    // SDK 可能返回 {data:{updateUser:fn}} 或 {data:null, error:{message:...}}
+    var updateUser = result && result.data ? result.data.updateUser : null;
+    if (typeof updateUser === 'function') {
+      _resetUpdateUser = updateUser;
+      showToast('验证码已发送');
+      startSmsCountdown();
+    } else {
+      btn.disabled = false; btn.textContent = '获取验证码';
+      var errMsg = (result && result.error && result.error.message) ? result.error.message : '请稍后重试';
+      showAuthError('验证码发送失败：' + errMsg);
+    }
+  }).catch(function(err){
+    btn.disabled = false; btn.textContent = '获取验证码';
+    showAuthError('验证码发送失败：' + (err && err.message ? err.message : '请稍后重试'));
+  });
+}
+
+// 提交重置密码
+function handleResetPassword() {
+  var phone = document.getElementById('auth-phone').value.trim();
+  var code = document.getElementById('auth-code').value.trim();
+  var pwd = document.getElementById('auth-pwd').value;
+  var pwd2 = document.getElementById('auth-pwd2').value;
+  if (!code) { showAuthError('请输入验证码'); return; }
+  if (pwd.length < 8) { showAuthError('密码至少8位，含字母和数字'); return; }
+  if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(pwd)) { showAuthError('密码需同时包含字母和数字'); return; }
+  if (pwd !== pwd2) { showAuthError('两次密码不一致'); return; }
+  if (!_resetUpdateUser) { showAuthError('请先获取验证码'); return; }
+
+  var btn = document.getElementById('auth-submit');
+  btn.disabled = true; btn.textContent = '重置中...';
+  _resetUpdateUser({ nonce: code, password: pwd }).then(function(result){
+    // 检查是否返回了 error
+    if (result && result.error) {
+      btn.disabled = false; btn.textContent = '重置密码';
+      showAuthError('重置失败：' + (result.error.message || '验证码可能已过期，请重新获取'));
+      return;
+    }
+    btn.disabled = false; btn.textContent = '重置密码';
+    _resetUpdateUser = null;
+    showToast('密码已重置，请登录');
+    // 清空验证码和密码
+    document.getElementById('auth-code').value = '';
+    document.getElementById('auth-pwd').value = '';
+    document.getElementById('auth-pwd2').value = '';
+    switchAuthMode('login');
+  }).catch(function(err){
+    btn.disabled = false; btn.textContent = '重置密码';
+    showAuthError('重置失败：' + (err && err.message ? err.message : '验证码可能已过期，请重新获取'));
+  });
 }
 
 // ===== 数据存储（用户隔离） =====
