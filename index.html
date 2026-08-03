@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.26';
+      var APP_VERSION = 'v4.0.27';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -439,6 +439,10 @@
     .auth-toggle{text-align:center;font-size:14px;color:var(--text-2);margin-top:20px}
     .auth-toggle a{color:var(--primary);font-weight:600;text-decoration:none;cursor:pointer}
     .auth-hint{text-align:center;font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6}
+    /* 登录方式切换标签 */
+    .auth-login-tabs{display:flex;background:var(--bg-input);border-radius:10px;padding:3px;margin-bottom:16px}
+    .auth-login-tabs .login-tab{flex:1;text-align:center;padding:8px;font-size:14px;color:var(--text-2);cursor:pointer;border-radius:7px;transition:all .2s;font-weight:500}
+    .auth-login-tabs .login-tab.active{background:var(--bg-card);color:var(--text-1);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
     /* 用户信息条 */
     .user-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg-card);border-bottom:.5px solid var(--border)}
     .user-bar .user-info{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)}
@@ -563,16 +567,20 @@
       <div class="auth-title">课时记录</div>
       <div class="auth-subtitle" id="auth-subtitle">登录后管理你的学员课时</div>
       <div class="auth-error" id="auth-error"></div>
+      <div class="auth-login-tabs" id="auth-login-tabs" style="display:none">
+        <div class="login-tab active" id="tab-password" onclick="switchLoginMethod('password')">密码登录</div>
+        <div class="login-tab" id="tab-code" onclick="switchLoginMethod('code')">验证码登录</div>
+      </div>
       <div class="auth-input-group">
         <span class="auth-icon"><svg><use href="#icon-phone"/></svg></span>
-        <input class="auth-input" id="auth-phone" type="tel" placeholder="手机号" maxlength="11" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('auth-code').style.display!=='none'?document.getElementById('auth-code').focus():document.getElementById('auth-pwd').focus()">
+        <input class="auth-input" id="auth-phone" type="tel" placeholder="手机号" maxlength="11" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='login'&&loginMethod==='code')document.getElementById('auth-code').focus();else if(authMode==='login')document.getElementById('auth-pwd').focus();else document.getElementById('auth-code').focus()}">
       </div>
       <div class="auth-input-group auth-code-group" id="auth-code-group">
         <span class="auth-icon"><svg><use href="#icon-lock"/></svg></span>
-        <input class="auth-input" id="auth-code" type="tel" placeholder="短信验证码" maxlength="6" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('auth-pwd').focus()">
+        <input class="auth-input" id="auth-code" type="tel" placeholder="短信验证码" maxlength="6" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='login'&&loginMethod==='code')handleAuth();else document.getElementById('auth-pwd').focus()}">
         <button type="button" class="auth-code-btn" id="auth-code-btn" onclick="sendSmsCode()">获取验证码</button>
       </div>
-      <div class="auth-input-group">
+      <div class="auth-input-group" id="auth-pwd-group">
         <span class="auth-icon"><svg><use href="#icon-lock"/></svg></span>
         <input class="auth-input" id="auth-pwd" type="password" placeholder="密码（8-32位，含字母和数字）" maxlength="32" autocomplete="off" onkeydown="if(event.key==='Enter'){if(authMode==='register'||authMode==='forgot')document.getElementById('auth-pwd2').focus();else handleAuth();}">
       </div>
@@ -1880,11 +1888,34 @@ function updateMemberBadge() {
 
 // 登录/注册模式切换
 var authMode = 'login';
+var loginMethod = 'password';  // 'password' 或 'code'，仅登录模式使用
 var smsCountdown = 0;
 var smsTimer = null;
+function switchLoginMethod(method) {
+  loginMethod = method;
+  var tabPwd = document.getElementById('tab-password');
+  var tabCode = document.getElementById('tab-code');
+  var codeGroup = document.getElementById('auth-code-group');
+  var pwdGroup = document.getElementById('auth-pwd-group');
+  var errorEl = document.getElementById('auth-error');
+  errorEl.classList.remove('show');
+  if (method === 'code') {
+    tabPwd.classList.remove('active');
+    tabCode.classList.add('active');
+    codeGroup.style.display = 'flex';
+    pwdGroup.style.display = 'none';
+  } else {
+    tabPwd.classList.add('active');
+    tabCode.classList.remove('active');
+    codeGroup.style.display = 'none';
+    pwdGroup.style.display = 'block';
+  }
+}
 function switchAuthMode(mode) {
   authMode = mode;
+  var loginTabs = document.getElementById('auth-login-tabs');
   var codeGroup = document.getElementById('auth-code-group');
+  var pwdGroup = document.getElementById('auth-pwd-group');
   var pwd2Group = document.getElementById('auth-pwd2-group');
   var submitBtn = document.getElementById('auth-submit');
   var toggleText = document.getElementById('auth-toggle-text');
@@ -1895,7 +1926,9 @@ function switchAuthMode(mode) {
   var errorEl = document.getElementById('auth-error');
   errorEl.classList.remove('show');
   if (mode === 'register') {
+    loginTabs.style.display = 'none';
     codeGroup.style.display = 'flex';
+    pwdGroup.style.display = 'block';
     pwd2Group.style.display = 'block';
     submitBtn.textContent = '注 册';
     submitBtn.onclick = handleAuth;
@@ -1907,7 +1940,9 @@ function switchAuthMode(mode) {
     subtitle.textContent = '创建账号，数据云端同步';
     if (hint) hint.textContent = '注册后可在任意设备登录使用';
   } else if (mode === 'forgot') {
+    loginTabs.style.display = 'none';
     codeGroup.style.display = 'flex';
+    pwdGroup.style.display = 'block';
     pwd2Group.style.display = 'block';
     submitBtn.textContent = '重置密码';
     submitBtn.onclick = handleResetPassword;
@@ -1920,7 +1955,8 @@ function switchAuthMode(mode) {
     subtitle.textContent = '通过短信验证码重置密码';
     if (hint) hint.textContent = '请输入注册时的手机号';
   } else {
-    codeGroup.style.display = 'none';
+    // 登录模式：显示切换标签，默认密码登录
+    loginTabs.style.display = 'flex';
     pwd2Group.style.display = 'none';
     submitBtn.textContent = '登 录';
     submitBtn.onclick = handleAuth;
@@ -1931,6 +1967,8 @@ function switchAuthMode(mode) {
     toggleText.innerHTML = '还没有账号？<a onclick="switchAuthMode(\'register\')">注册</a>';
     subtitle.textContent = '登录后管理你的学员课时';
     if (hint) hint.textContent = '登录后数据云端同步，多机共用';
+    // 恢复到上次选择的登录方式（默认密码）
+    switchLoginMethod(loginMethod || 'password');
   }
 }
 
@@ -2001,15 +2039,28 @@ function handleAuth() {
       showAuthError('注册失败：' + (err && err.message ? err.message : '验证码可能已过期，请重新获取'));
     });
   } else {
-    if (pwd.length < 8) { showAuthError('请输入密码'); btn.disabled=false; btn.textContent=origText; return; }
+    // 登录模式
     // 先清除旧登录态，防止 CloudBase 缓存上一个用户的 auth state
     try { cbAuth.signOut(); } catch(e) {}
-    cbAuth.signInWithPhoneCodeOrPassword({ phoneNumber: phone, password: pwd }).then(function(){
-      return afterAuthSuccess(phone, false);
-    }).catch(function(err){
-      btn.disabled=false; btn.textContent=origText;
-      showAuthError('登录失败：' + (err && err.message ? err.message : '手机号或密码错误'));
-    });
+    if (loginMethod === 'code') {
+      // 验证码登录
+      if (!code) { showAuthError('请输入验证码'); btn.disabled=false; btn.textContent=origText; return; }
+      cbAuth.signInWithPhoneCodeOrPassword({ phoneNumber: phone, smsCode: code }).then(function(){
+        return afterAuthSuccess(phone, false);
+      }).catch(function(err){
+        btn.disabled=false; btn.textContent=origText;
+        showAuthError('登录失败：' + (err && err.message ? err.message : '验证码错误或已过期'));
+      });
+    } else {
+      // 密码登录
+      if (pwd.length < 8) { showAuthError('请输入密码'); btn.disabled=false; btn.textContent=origText; return; }
+      cbAuth.signInWithPhoneCodeOrPassword({ phoneNumber: phone, password: pwd }).then(function(){
+        return afterAuthSuccess(phone, false);
+      }).catch(function(err){
+        btn.disabled=false; btn.textContent=origText;
+        showAuthError('登录失败：' + (err && err.message ? err.message : '手机号或密码错误'));
+      });
+    }
   }
 }
 
