@@ -1,6 +1,6 @@
 // Service Worker - 课时记录 PWA
 // 每次部署新版本时，修改下方 VERSION 即可触发更新
-const VERSION = 'v4.0.27';
+const VERSION = 'v4.0.33';
 const CACHE_NAME = 'keshi-app-' + VERSION;
 
 // 需要预缓存的静态资源（版本不变则走缓存，版本升级则重新下载）
@@ -46,9 +46,10 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   // index.html：网络优先（保证每次都拿到最新版）
+  // cache: 'no-cache' 强制绕过 HTTP 缓存，避免 CloudStudio 无 Cache-Control 头导致启发式缓存
   if (url.pathname.endsWith('/') || url.pathname.endsWith('/index.html')) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: 'no-cache' })
         .then(res => {
           // 网络成功，缓存一份供离线使用
           const resClone = res.clone();

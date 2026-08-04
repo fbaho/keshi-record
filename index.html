@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.27';
+      var APP_VERSION = 'v4.0.33';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -414,9 +414,6 @@
     .tt-noslot-name{font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:4px}
     .tt-export-bar{padding:8px 16px 4px;display:flex;gap:8px}
     .tt-export-bar .btn{flex:1;font-size:14px;padding:10px}
-    /* 点格子快速添加弹窗：外部学生历史标签 */
-    .cell-recent-tag{padding:5px 12px;border-radius:14px;background:var(--bg-grouped);font-size:13px;color:var(--text-2);cursor:pointer;border:1px solid var(--border-light);transition:all .15s;-webkit-tap-highlight-color:transparent}
-    .cell-recent-tag:active{background:var(--primary);color:#fff;border-color:var(--primary)}
     /* tabbar 5 列适配 */
     .tabbar-item{flex:1}
     .batch-toolbar{display:flex;align-items:center;gap:14px;font-size:13px;margin-left:auto}
@@ -856,12 +853,12 @@
     </div>
     <div class="form-group">
       <label>上课学员 <span style="font-size:12px;color:var(--text-3);font-weight:400">（可多选）</span></label>
-      <div id="tt-student-list" style="max-height:200px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
-      <div>
-        <button type="button" class="btn btn-outline tt-ext-btn" style="width:100%;padding:10px 14px;margin-bottom:8px" onclick="toggleExternalStudent(event)">外部学生</button>
-        <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名，多个用逗号分隔">
-        <div id="tt-recent-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:8px;margin-top:6px"></div>
+      <div id="tt-student-list" style="max-height:160px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm)"></div>
+      <div id="tt-ext-divider" style="border-top:1px dashed var(--border);margin:12px 0;text-align:center;display:none">
+        <span style="background:var(--bg);padding:0 10px;font-size:12px;color:var(--text-3);position:relative;top:-8px">或 外部学生（输入一次，下次直接点选）</span>
       </div>
+      <div id="tt-ext-list" style="max-height:140px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px;display:none"></div>
+      <input class="form-input" id="tt-ext-name" placeholder="输入外部学生姓名，多个用逗号分隔" style="margin-bottom:6px">
     </div>
     <div class="form-group">
       <label>课时数</label>
@@ -909,11 +906,12 @@
     <div style="font-size:13px;color:var(--text-2);margin-bottom:14px;line-height:1.6" id="cell-add-subtitle"></div>
     <div class="form-group">
       <label>上课学员 <span style="font-size:12px;color:var(--text-3);font-weight:400">（可多选）</span></label>
-      <div id="cell-student-list" style="max-height:180px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px"></div>
-      <div>
-        <input class="form-input" id="cell-ext-name" placeholder="或输入外部学生姓名，多个用逗号分隔" style="margin-bottom:8px">
-        <div id="cell-recent-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:8px"></div>
+      <div id="cell-student-list" style="max-height:150px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm)"></div>
+      <div id="cell-ext-divider" style="border-top:1px dashed var(--border);margin:12px 0;text-align:center;display:none">
+        <span style="background:var(--bg);padding:0 10px;font-size:12px;color:var(--text-3);position:relative;top:-8px">或 外部学生（输入一次，下次直接点选）</span>
       </div>
+      <div id="cell-ext-list" style="max-height:120px;overflow-y:auto;border:.5px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px;display:none"></div>
+      <input class="form-input" id="cell-ext-name" placeholder="输入外部学生姓名，多个用逗号分隔" style="margin-bottom:6px">
     </div>
     <div class="form-group">
       <label>课时数</label>
@@ -1140,7 +1138,6 @@ function cbPullAndMerge(opts) {
     if (typeof renderStudents === 'function') renderStudents();
     if (typeof renderTimetable === 'function') renderTimetable();
     if (typeof updateMemberBadge === 'function') updateMemberBadge();
-    if (typeof renderRecentExternalTags === 'function') renderRecentExternalTags();
     return true;
   }).catch(function(err){
     _cbPulling = false;
@@ -1286,7 +1283,7 @@ function getMembershipInfo(phone) {
   if (p && p.lifetime) {
     return { plan: m.plan, status: 'active', startDate: m.startDate, expireDate: '永久', permanent: true };
   }
-  var nowStr = new Date().toISOString().slice(0, 10);
+  var nowStr = toLocalDateString(new Date());
   if (m.expireDate && m.expireDate < nowStr) {
     return { plan: null, status: 'expired', expiredPlan: m.plan, expiredDate: m.expireDate };
   }
@@ -1319,7 +1316,7 @@ function purchaseMembership(plan) {
   if (!users[phone]) return false;
   var p = MEMBERSHIP_PLANS[plan];
   var now = new Date();
-  var startStr = now.toISOString().slice(0, 10);
+  var startStr = toLocalDateString(now);
   var expireDate;
   if (p.lifetime) {
     // 永久会员，过期日期设为 9999-12-31
@@ -1335,7 +1332,7 @@ function purchaseMembership(plan) {
   users[phone].membership = {
     plan: plan,
     startDate: startStr,
-    expireDate: expireDate.toISOString().slice(0, 10)
+    expireDate: toLocalDateString(expireDate)
   };
   saveUsers(users);
   return true;
@@ -1990,7 +1987,24 @@ function sendSmsCode() {
     startSmsCountdown();
   }).catch(function(err){
     btn.disabled = false; btn.textContent = '获取验证码';
-    showAuthError('验证码发送失败：' + (err && err.message ? err.message : '请稍后重试'));
+    // 详细错误：把 err 整个对象的常见字段都展示出来
+    var msg = '';
+    if (err) {
+      msg = err.message || err.errMsg || err.errorMsg || err.code || String(err);
+      // 有些 SDK 返回 {error:{message:'xxx'}, requestId:'yyy'}
+      if (!err.message && err.error && err.error.message) msg = err.error.message;
+    }
+    if (!msg) msg = '请稍后重试';
+    console.error('发送验证码失败:', err);
+    showAuthError('验证码发送失败：' + msg);
+    // 屏幕顶部额外显示完整错误对象（方便排查）
+    try {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff4d4f;color:#fff;padding:10px;font-size:11px;font-family:monospace;line-height:1.4;word-break:break-all;max-height:50vh;overflow:auto;cursor:pointer';
+      div.textContent = '【短信错误详情】 ' + JSON.stringify(err, Object.getOwnPropertyNames(err || {}));
+      div.onclick = function(){ this.remove(); };
+      document.body.appendChild(div);
+    } catch(_) {}
   });
 }
 
@@ -2235,7 +2249,6 @@ function sendResetSmsCode() {
   var btn = document.getElementById('auth-code-btn');
   btn.disabled = true; btn.textContent = '发送中...';
   cbAuth.resetPasswordForEmail(phone).then(function(result){
-    // SDK 可能返回 {data:{updateUser:fn}} 或 {data:null, error:{message:...}}
     var updateUser = result && result.data ? result.data.updateUser : null;
     if (typeof updateUser === 'function') {
       _resetUpdateUser = updateUser;
@@ -2248,7 +2261,21 @@ function sendResetSmsCode() {
     }
   }).catch(function(err){
     btn.disabled = false; btn.textContent = '获取验证码';
-    showAuthError('验证码发送失败：' + (err && err.message ? err.message : '请稍后重试'));
+    var msg = '';
+    if (err) {
+      msg = err.message || err.errMsg || err.errorMsg || err.code || String(err);
+      if (!err.message && err.error && err.error.message) msg = err.error.message;
+    }
+    if (!msg) msg = '请稍后重试';
+    console.error('发送重置验证码失败:', err);
+    showAuthError('验证码发送失败：' + msg);
+    try {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff4d4f;color:#fff;padding:10px;font-size:11px;font-family:monospace;line-height:1.4;word-break:break-all;max-height:50vh;overflow:auto;cursor:pointer';
+      div.textContent = '【重置短信错误详情】 ' + JSON.stringify(err, Object.getOwnPropertyNames(err || {}));
+      div.onclick = function(){ this.remove(); };
+      document.body.appendChild(div);
+    } catch(_) {}
   });
 }
 
@@ -2577,7 +2604,7 @@ function skipAutoDeduct() {
 let ttWeekOffset = 0; // 0=本周, -1=上周, 1=下周
 let ttSelectedDay = 1; // 默认周一
 let ttSelectedStudentIds = []; // 多选学员，空数组=未选
-let ttIsExternal = false;
+let ttSelectedExtNames = []; // 多选外部学生名字
 
 function getWeekDates(offset) {
   // offset=0 本周, -1 上周, 1 下周
@@ -2756,30 +2783,70 @@ function openAddTimetableEntry() {
       '<div class="tt-check" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0"></div></div>';
   });
   if (students.length === 0) {
-    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，请在下方输入外部学生</div>';
+    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，可直接在下方添加外部学生</div>';
   }
   document.getElementById('tt-student-list').innerHTML = listHtml;
 
+  // 外部学生列表独立渲染
+  var extNames = data.recentExternalNames || [];
+  document.getElementById('tt-ext-divider').style.display = extNames.length > 0 ? '' : 'none';
+  document.getElementById('tt-ext-list').style.display = extNames.length > 0 ? '' : 'none';
+  document.getElementById('tt-ext-list').innerHTML = extNames.length > 0 ? renderExtStudentList(extNames, 'toggleTtExtStudent') : '';
+
   // 重置状态
   ttSelectedStudentIds = [];
-  ttIsExternal = false;
+  ttSelectedExtNames = [];
   document.getElementById('tt-ext-name').value = '';
-  document.getElementById('tt-ext-name').style.display = '';
   document.getElementById('tt-time').value = '';
   document.getElementById('tt-hours').value = 1;
   document.getElementById('tt-note').value = '';
-  // 重置外部学生按钮文字和样式
-  var ttBtn = document.querySelector('#modal-add-tt .tt-ext-btn');
-  if (ttBtn) {
-    ttBtn.style.background = '';
-    ttBtn.style.color = '';
-    ttBtn.style.borderColor = '';
-    ttBtn.textContent = '外部学生';
-  }
-  // 渲染外部学生历史名字标签
-  renderRecentExternalTags('tt-recent-tags');
 
   openModal('modal-add-tt');
+}
+
+
+// 切换选中外部学生（+号弹窗）
+function toggleTtExtStudent(el, name) {
+  var idx = ttSelectedExtNames.indexOf(name);
+  var chk = el.querySelector('.tt-check');
+  if (idx >= 0) {
+    ttSelectedExtNames.splice(idx, 1);
+    el.style.background = '';
+    if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
+  } else {
+    ttSelectedExtNames.push(name);
+    el.style.background = 'var(--primary-bg)';
+    if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
+  }
+}
+
+// 切换选中外部学生（格子弹窗）
+function toggleCellExtStudent(el, name) {
+  var idx = cellSelectedExtNames.indexOf(name);
+  var chk = el.querySelector('.tt-check');
+  if (idx >= 0) {
+    cellSelectedExtNames.splice(idx, 1);
+    el.style.background = '';
+    if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
+  } else {
+    cellSelectedExtNames.push(name);
+    el.style.background = 'var(--primary-bg)';
+    if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
+  }
+}
+
+// 生成外部学生列表 HTML
+function renderExtStudentList(names, onclickFn) {
+  if (!names || names.length === 0) return '';
+  var html = '<div style="padding:6px 12px;font-size:12px;color:var(--text-3);background:var(--bg-2)">常用外部学生</div>';
+  names.forEach(function(n) {
+    html += '<div class="tt-student-pick" onclick="' + onclickFn + '(this,\'' + n.replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:.5px solid var(--border-light);cursor:pointer;transition:background .15s">' +
+      '<div class="avatar" style="width:28px;height:28px;border-radius:50%;background:var(--text-3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">' + n.charAt(0) + '</div>' +
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;color:var(--text-1)">' + n + '</div>' +
+      '<div style="font-size:11px;color:var(--text-3)">外部学生</div></div>' +
+      '<div class="tt-check" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0"></div></div>';
+  });
+  return html;
 }
 
 function selectTtDay(el, dateStr) {
@@ -2804,51 +2871,7 @@ function selectTtStudent(el, studentId) {
     var chk = el.querySelector('.tt-check');
     if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
   }
-  ttIsExternal = false;
-  // 清空外部输入
-  document.getElementById('tt-ext-name').value = '';
-  // 重置外部学生按钮状态
-  var ttBtn = document.querySelector('#modal-add-tt .tt-ext-btn');
-  if (ttBtn) {
-    ttBtn.style.background = '';
-    ttBtn.style.color = '';
-    ttBtn.style.borderColor = '';
-    ttBtn.textContent = '外部学生';
-  }
   // 多选时不清空课时（保留用户手动输入或默认值）
-}
-
-function toggleExternalStudent(ev) {
-  ttIsExternal = !ttIsExternal;
-  var extInput = document.getElementById('tt-ext-name');
-  // 兼容 iOS PWA 里全局 event 不可用的情况：优先用传入的 ev，否则用 window.event
-  var srcEl = (ev && ev.target) ? ev.target : (window.event && window.event.target);
-  var btn = srcEl ? srcEl.closest('button') : null;
-  // 兜底：找不到按钮就按 id 找
-  if (!btn) btn = document.querySelector('#modal-add-tt .tt-ext-btn');
-  if (ttIsExternal) {
-    // 取消 app 学员选中
-    document.querySelectorAll('#tt-student-list .tt-student-pick').forEach(function(p) {
-      p.style.background = '';
-      var chk = p.querySelector('.tt-check');
-      if (chk) { chk.style.background = ''; chk.style.borderColor = 'var(--border)'; chk.innerHTML = ''; }
-    });
-    ttSelectedStudentIds = [];
-    extInput.focus();
-    if (btn) {
-      btn.style.background = 'var(--primary)';
-      btn.style.color = '#fff';
-      btn.style.borderColor = 'var(--primary)';
-      btn.textContent = '已选外部';
-    }
-  } else {
-    if (btn) {
-      btn.style.background = '';
-      btn.style.color = '';
-      btn.style.borderColor = '';
-      btn.textContent = '外部学生';
-    }
-  }
 }
 
 function handleAddTimetableEntry() {
@@ -2862,7 +2885,7 @@ function handleAddTimetableEntry() {
   // 收集要添加的学生列表
   var studentsToAdd = [];
 
-  // 优先检测外部学生输入框（支持逗号分隔多个名字）
+  // 1. 从输入框获取新外部学生（支持逗号分隔多个名字）
   var extRaw = document.getElementById('tt-ext-name').value.trim();
   if (extRaw) {
     var extNames = extRaw.split(/[,，、\s]+/).filter(function(n) { return n.trim(); });
@@ -2871,7 +2894,12 @@ function handleAddTimetableEntry() {
     });
   }
 
-  // 再加选中的 app 学员（可多选）
+  // 2. 从列表中选中的外部学生（点选）
+  ttSelectedExtNames.forEach(function(n) {
+    studentsToAdd.push({ name: n, id: null, isExternal: true });
+  });
+
+  // 3. 选中的 app 学员（可多选）
   if (ttSelectedStudentIds.length > 0) {
     var data = loadDB();
     ttSelectedStudentIds.forEach(function(sid) {
@@ -2902,10 +2930,10 @@ function handleAddTimetableEntry() {
       autoDeducted: false
     });
   });
-  // 记录外部学生历史
-  if (extRaw) rememberExternalNames(extRaw);
   saveDB(data);
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+  // 记录外部学生历史（必须在 saveDB 之后，否则会被覆盖）
+  if (extRaw) rememberExternalNames(extRaw);
 
   closeModal('modal-add-tt');
   renderTimetable();
@@ -2915,6 +2943,8 @@ function handleAddTimetableEntry() {
 // ===== 点格子快速添加：日期+时段已由格子确定，不再让用户选时间 =====
 let cellSelectedDate = '';
 let cellSelectedTime = '';
+let cellSelectedStudentIds = [];
+let cellSelectedExtNames = []; // 多选外部学生名字
 
 function openCellQuickAdd(dateStr, slotIdx) {
   cellSelectedDate = dateStr;
@@ -2944,23 +2974,25 @@ function openCellQuickAdd(dateStr, slotIdx) {
       '<div class="tt-check" style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0"></div></div>';
   });
   if (students.length === 0) {
-    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，请在下方输入外部学生</div>';
+    listHtml = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">暂无学员，可直接在下方添加外部学生</div>';
   }
   document.getElementById('cell-student-list').innerHTML = listHtml;
 
+  // 外部学生列表独立渲染
+  var extNames = data.recentExternalNames || [];
+  document.getElementById('cell-ext-divider').style.display = extNames.length > 0 ? '' : 'none';
+  document.getElementById('cell-ext-list').style.display = extNames.length > 0 ? '' : 'none';
+  document.getElementById('cell-ext-list').innerHTML = extNames.length > 0 ? renderExtStudentList(extNames, 'toggleCellExtStudent') : '';
+
   // 重置状态
   cellSelectedStudentIds = [];
+  cellSelectedExtNames = [];
   document.getElementById('cell-ext-name').value = '';
   document.getElementById('cell-hours').value = 1;
   document.getElementById('cell-note').value = '';
 
-  // 渲染历史外部学生名字快捷标签
-  renderRecentExternalTags();
-
   openModal('modal-cell-add');
 }
-
-let cellSelectedStudentIds = [];
 
 function toggleCellStudent(el, studentId) {
   var idx = cellSelectedStudentIds.indexOf(studentId);
@@ -2975,36 +3007,6 @@ function toggleCellStudent(el, studentId) {
     var chk = el.querySelector('.tt-check');
     if (chk) { chk.style.background = 'var(--primary)'; chk.style.borderColor = 'var(--primary)'; chk.innerHTML = '<span style="color:#fff;font-size:12px;line-height:18px">✓</span>'; }
   }
-}
-
-function renderRecentExternalTags(containerId) {
-  containerId = containerId || 'cell-recent-tags';
-  var data = loadDB();
-  var names = (data.recentExternalNames || []).slice(0, 12);
-  var box = document.getElementById(containerId);
-  if (!box) return;
-  if (names.length === 0) {
-    box.innerHTML = '';
-    return;
-  }
-  var inputId = containerId === 'tt-recent-tags' ? 'tt-ext-name' : 'cell-ext-name';
-  var html = '<span style="font-size:12px;color:var(--text-3);line-height:28px;margin-right:2px">常用：</span>';
-  names.forEach(function(n) {
-    html += '<span class="cell-recent-tag" onclick="appendRecentToExt(\'' + n.replace(/'/g, "\\'") + '\',\'' + inputId + '\')">' + n + '</span>';
-  });
-  box.innerHTML = html;
-}
-
-function appendRecentToExt(name, inputId) {
-  inputId = inputId || 'cell-ext-name';
-  var input = document.getElementById(inputId);
-  if (!input) return;
-  var cur = input.value.trim();
-  // 智能追加：避免重复
-  var parts = cur ? cur.split(/[,，、\s]+/).filter(function(x) { return x.trim(); }) : [];
-  if (parts.indexOf(name) === -1) parts.push(name);
-  input.value = parts.join(',');
-  input.focus();
 }
 
 function rememberExternalNames(rawText) {
@@ -3030,7 +3032,7 @@ function handleCellAdd() {
 
   var studentsToAdd = [];
 
-  // 外部学生输入框（支持逗号分隔）
+  // 1. 外部学生输入框（新名字，支持逗号分隔）
   var extRaw = document.getElementById('cell-ext-name').value.trim();
   if (extRaw) {
     var extNames = extRaw.split(/[,，、\s]+/).filter(function(n) { return n.trim(); });
@@ -3039,7 +3041,12 @@ function handleCellAdd() {
     });
   }
 
-  // 选中的 app 学员
+  // 2. 从列表中选中的外部学生（点选）
+  cellSelectedExtNames.forEach(function(n) {
+    studentsToAdd.push({ name: n, id: null, isExternal: true });
+  });
+
+  // 3. 选中的 app 学员
   if (cellSelectedStudentIds.length > 0) {
     var data = loadDB();
     cellSelectedStudentIds.forEach(function(sid) {
@@ -3070,11 +3077,10 @@ function handleCellAdd() {
     });
   });
 
-  // 记录外部学生历史
-  if (extRaw) rememberExternalNames(extRaw);
-
   saveDB(data);
   if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+  // 记录外部学生历史（必须在 saveDB 之后，否则会被覆盖）
+  if (extRaw) rememberExternalNames(extRaw);
 
   closeModal('modal-cell-add');
   renderTimetable();
@@ -3485,8 +3491,8 @@ function renderHome() {
   document.getElementById('d-students').innerHTML = sum.totalStudents + '<span class="hs-unit">人</span>';
   // 本月消耗金额
   var nowM = new Date();
-  var monthStart = new Date(nowM.getFullYear(), nowM.getMonth(), 1).toISOString().slice(0,10);
-  var monthEnd = nowM.toISOString().slice(0,10);
+  var monthStart = toLocalDateString(new Date(nowM.getFullYear(), nowM.getMonth(), 1));
+  var monthEnd = toLocalDateString(nowM);
   var monthStats = getStatsByDateRange(monthStart, monthEnd);
   document.getElementById('d-consumed').textContent = '¥' + fmt(monthStats.totalAmount);
   document.getElementById('d-hours').innerHTML = fmt(sum.totalRemainingHours) + '<span class="hs-unit">课时</span>';
@@ -3497,7 +3503,7 @@ function renderHome() {
     alertsEl.innerHTML = '<div class="card"><div class="card-title"><span style="display:flex;align-items:center;gap:5px">'+svgIcon('warning')+' 课时预警</span></div>' +
       low.map(s => '<div class="record-item" onclick="openDetail(\''+s.id+'\')"><div class="avatar">'+avatar(s.name)+'</div><div class="info"><div class="name">'+s.name+'</div><div class="meta">剩余 '+s.remainingHours+' 课时 · ¥'+fmt(s.receivedAmount)+'</div></div><div class="amount"><div class="num" style="color:var(--warning)">'+s.remainingHours+'</div><div class="hours">剩余课时</div></div></div>').join('') + '</div>';
   } else { alertsEl.innerHTML = ''; }
-  const today = new Date().toISOString().slice(0,10);
+  const today = toLocalDateString(new Date());
   const records = getRecords();
   const todayRec = records.filter(r => r.date === today);
   const todayEl = document.getElementById('home-today');
@@ -4043,7 +4049,7 @@ function handleAdjustAmount() {
     id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
     studentId: student.id,
     studentName: student.name,
-    date: new Date().toISOString().slice(0,10),
+    date: toLocalDateString(new Date()),
     type: 'adjust',
     adjustMode: priceDiff >= 0 ? 'add' : 'sub',
     adjustAmount: +Math.abs(adjustTotal).toFixed(2),
@@ -4345,7 +4351,7 @@ function handleDeleteRecord(recordId) {
 
 // ===== 消课 =====
 function renderConsume() {
-  document.getElementById('consume-date-input').value = new Date().toISOString().slice(0,10);
+  document.getElementById('consume-date-input').value = toLocalDateString(new Date());
   const students = getStudents().sort((a,b) => {
     const aDone = a.remainingHours <= 0 ? 1 : 0;
     const bDone = b.remainingHours <= 0 ? 1 : 0;
@@ -4446,7 +4452,7 @@ function switchConsumeMode(mode) {
   document.getElementById('consume-batch-area').style.display = mode === 'batch' ? '' : 'none';
   if (mode === 'batch' && batchRows.length === 0) {
     // 初始化第一行
-    batchRows = [{ studentId: '', date: new Date().toISOString().slice(0,10), hours: 1 }];
+    batchRows = [{ studentId: '', date: toLocalDateString(new Date()), hours: 1 }];
     renderBatchRows();
   }
 }
@@ -4493,7 +4499,7 @@ function renderBatchRows() {
 }
 
 function addBatchRow() {
-  batchRows.push({ studentId: '', date: new Date().toISOString().slice(0,10), hours: 1 });
+  batchRows.push({ studentId: '', date: toLocalDateString(new Date()), hours: 1 });
   renderBatchRows();
   // 滚动到新增行
   setTimeout(() => {
@@ -4505,7 +4511,7 @@ function addBatchRow() {
 function removeBatchRow(idx) {
   batchRows.splice(idx, 1);
   if (batchRows.length === 0) {
-    batchRows.push({ studentId: '', date: new Date().toISOString().slice(0,10), hours: 1 });
+    batchRows.push({ studentId: '', date: toLocalDateString(new Date()), hours: 1 });
   }
   renderBatchRows();
 }
@@ -4580,7 +4586,7 @@ function handleBatchConsume() {
   const msg = '确认补录以下消课记录？\n共 ' + validRows.length + ' 条\n总课时：' + validRows.reduce((s,r) => s + r.hours, 0).toFixed(1) + ' 节\n\n此操作将添加到消课记录中。';
   showConfirm(msg, function() {
     addRecordsDB(consumptions);
-    batchRows = [{ studentId: '', date: new Date().toISOString().slice(0,10), hours: 1 }];
+    batchRows = [{ studentId: '', date: toLocalDateString(new Date()), hours: 1 }];
     renderBatchRows();
     renderHome();
     const totalHours = consumptions.reduce((s,c) => s + c.hours, 0);
@@ -4784,9 +4790,9 @@ function loadStats(range) {
   document.getElementById('stats-period').style.display = 'none';
   document.getElementById('stats-overview').style.display = 'grid';
   const now = new Date();
-  let startDate, endDate = now.toISOString().slice(0,10);
-  if (range === 'week') { const ws = new Date(now); ws.setDate(now.getDate()-now.getDay()+1); startDate = ws.toISOString().slice(0,10); }
-  else if (range === 'month') { startDate = new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10); }
+  let startDate, endDate = toLocalDateString(now);
+  if (range === 'week') { const ws = new Date(now); ws.setDate(now.getDate()-now.getDay()+1); startDate = toLocalDateString(ws); }
+  else if (range === 'month') { startDate = toLocalDateString(new Date(now.getFullYear(),now.getMonth(),1)); }
   else { startDate = '2000-01-01'; }
   const stats = getStatsByDateRange(startDate, endDate);
   const ov = document.getElementById('stats-overview');
@@ -4827,7 +4833,7 @@ function getWeekMonday(dateStr) {
   var day = d.getDay();
   var diff = (day === 0 ? -6 : 1 - day);
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateString(d);
 }
 function getMonthKey(dateStr) {
   return dateStr.slice(0, 7);
@@ -4956,7 +4962,7 @@ function loadCustomStats() {
   var startEl = document.getElementById('custom-start');
   var endEl = document.getElementById('custom-end');
   if (!startEl.value) startEl.value = ym + '-01';
-  if (!endEl.value) endEl.value = now.toISOString().slice(0,10);
+  if (!endEl.value) endEl.value = toLocalDateString(now);
 }
 
 function setQuickRange(type) {
@@ -4966,17 +4972,17 @@ function setQuickRange(type) {
   if (type === 'thisMonth') {
     var ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
     startEl.value = ym + '-01';
-    endEl.value = now.toISOString().slice(0,10);
+    endEl.value = toLocalDateString(now);
   } else if (type === 'lastMonth') {
     var lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
     var lmEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    startEl.value = lm.toISOString().slice(0,10);
-    endEl.value = lmEnd.toISOString().slice(0,10);
+    startEl.value = toLocalDateString(lm);
+    endEl.value = toLocalDateString(lmEnd);
   } else {
     var days = parseInt(type);
     var s = new Date(now.getTime() - (days-1)*86400000);
-    startEl.value = s.toISOString().slice(0,10);
-    endEl.value = now.toISOString().slice(0,10);
+    startEl.value = toLocalDateString(s);
+    endEl.value = toLocalDateString(now);
   }
 }
 
@@ -5144,7 +5150,7 @@ function exportExcel() {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url; link.download = '课时记录_'+new Date().toISOString().slice(0,10)+'.csv';
+  link.href = url; link.download = '课时记录_'+toLocalDateString(new Date())+'.csv';
   link.click(); URL.revokeObjectURL(url);
   showToast('导出成功');
 }
@@ -5195,7 +5201,7 @@ function exportExcelXlsx() {
   sumSheet['!cols'] = [{wch:20},{wch:14}];
   XLSX.utils.book_append_sheet(wb, sumSheet, '全局汇总');
 
-  XLSX.writeFile(wb, '课时记录_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb, '课时记录_'+toLocalDateString(new Date())+'.xlsx');
   showToast('Excel 已导出');
 }
 
@@ -5217,7 +5223,7 @@ function exportDataBackup() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = '课时数据备份_' + new Date().toISOString().slice(0,10) + '.json';
+  link.download = '课时数据备份_' + toLocalDateString(new Date()) + '.json';
   link.click();
   URL.revokeObjectURL(url);
   showToast('备份已下载，请妥善保存');
@@ -5362,11 +5368,11 @@ function parseExcelToData(wb) {
   const toInt = (v) => Math.round(toNum(v));
   // 解析日期：支持 "2026-07-03" / "2026/7/3" / Excel 序列号 / 时间戳
   const toDate = (v) => {
-    if (!v) return new Date().toISOString().slice(0, 10);
+    if (!v) return toLocalDateString(new Date());
     if (typeof v === 'number') {
       // Excel 序列号 → 日期
       const d = new Date(Math.round((v - 25569) * 86400 * 1000));
-      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      if (!isNaN(d.getTime())) return toLocalDateString(d);
     }
     const s = String(v).trim();
     const m = s.match(/(\d{4})[-\/年.](\d{1,2})[-\/月.](\d{1,2})/);
@@ -5470,7 +5476,7 @@ function parseExcelToData(wb) {
         remainingHours: totalHours,
         giftedPositions: giftPos,
         notes: stuCols.notes >= 0 ? String(r[stuCols.notes] || '').trim() : '',
-        createdAt: (stuCols.date >= 0 ? toDate(r[stuCols.date]) : new Date().toISOString().slice(0,10)) + 'T00:00:00.000Z'
+        createdAt: (stuCols.date >= 0 ? toDate(r[stuCols.date]) : toLocalDateString(new Date())) + 'T00:00:00.000Z'
       });
     }
   }
@@ -5586,22 +5592,23 @@ function applyUpdate() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
+      // 主动触发 SW 更新检查（iOS PWA 默认不每次都检查）
+      reg.update();
+
       // 检测到新版本正在安装
       reg.addEventListener('updatefound', () => {
         const worker = reg.installing;
         worker.addEventListener('statechange', () => {
-          if (worker.state === 'waiting') {
-            // 新版本已下载完毕，等待激活
-            newWorker = worker;
-            document.getElementById('update-banner').classList.add('show');
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            // 新版本已下载完毕，直接激活（不等用户点横幅）
+            worker.postMessage('skip-waiting');
           }
         });
       });
 
-      // 如果页面加载时已经有 waiting 的 worker（比如用户清了缓存但 SW 还在）
+      // 如果页面加载时已经有 waiting 的 worker，直接激活
       if (reg.waiting) {
-        newWorker = reg.waiting;
-        document.getElementById('update-banner').classList.add('show');
+        reg.waiting.postMessage('skip-waiting');
       }
     }).catch(err => console.log('SW 注册失败：', err));
 
