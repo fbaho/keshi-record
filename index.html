@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.34';
+      var APP_VERSION = 'v4.0.35';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -695,6 +695,7 @@
     </div>
     <div class="tt-export-bar">
       <button class="btn btn-outline" style="flex:1" onclick="goToCurrentWeek()">本周</button>
+      <button class="btn btn-outline" style="flex:1" onclick="copyLastWeek()" id="tt-copy-btn">复制上周</button>
       <button class="btn btn-outline" style="flex:1" onclick="exportTimetable()">导出课表</button>
     </div>
     <div class="tt-week" id="tt-week"></div>
@@ -2636,6 +2637,84 @@ function goToCurrentWeek() {
   renderTimetable();
 }
 
+function copyLastWeek() {
+  var data = loadDB();
+  if (!data.timetable) { showToast('课表为空，没有可复制的内容'); return; }
+
+  var curDates = getWeekDates(ttWeekOffset);
+  var prevDates = getWeekDates(ttWeekOffset - 1);
+
+  // 上周和本周的日期范围字符串
+  var prevStart = toLocalDateString(prevDates[0]);
+  var prevEnd = toLocalDateString(prevDates[6]);
+  var curStart = toLocalDateString(curDates[0]);
+
+  // 筛选上周的排课条目
+  var prevEntries = data.timetable.filter(function(e) {
+    return e.date >= prevStart && e.date <= prevEnd;
+  });
+
+  if (prevEntries.length === 0) {
+    showToast('上周没有排课，无需复制');
+    return;
+  }
+
+  // 检查当前周是否已有排课，避免完全重复复制
+  var curDateSet = {};
+  curDates.forEach(function(d, i) {
+    curDateSet[toLocalDateString(d)] = true;
+  });
+
+  // 当前周已有的排课（用于去重检查）
+  var curEntryKeys = {};
+  data.timetable.forEach(function(e) {
+    if (curDateSet[e.date]) {
+      var key = e.date + '|' + (e.studentId || 'ext:' + e.studentName) + '|' + (e.time || '');
+      curEntryKeys[key] = true;
+    }
+  });
+
+  var copied = 0;
+  var baseTs = Date.now();
+  prevEntries.forEach(function(e, i) {
+    // 计算复制到本周的日期（日期向后推 7 天）
+    var d = new Date(e.date + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    var newDate = toLocalDateString(d);
+
+    // 确保目标日期在本周范围内
+    if (!curDateSet[newDate]) return;
+
+    // 去重检查：如果本周同一天同一学生同一时段已有排课，跳过
+    var newKey = newDate + '|' + (e.studentId || 'ext:' + e.studentName) + '|' + (e.time || '');
+    if (curEntryKeys[newKey]) return;
+    curEntryKeys[newKey] = true; // 防止本批次内的重复
+
+    data.timetable.push({
+      id: 'tt_copy_' + baseTs + '_' + i + '_' + Math.random().toString(36).slice(2,8),
+      date: newDate,
+      time: e.time,
+      studentId: e.studentId,
+      studentName: e.studentName,
+      isExternal: e.isExternal || false,
+      hours: e.hours,
+      note: e.note || '',
+      autoDeducted: false
+    });
+    copied++;
+  });
+
+  if (copied === 0) {
+    showToast('本周已有相同排课，无需复制');
+    return;
+  }
+
+  saveDB(data);
+  if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+  renderTimetable();
+  showToast('已复制 ' + copied + ' 节课程');
+}
+
 var TIME_SLOTS = [
   {name: '第一节', time: '8:00-10:00'},
   {name: '第二节', time: '10:10-12:10'},
@@ -2669,6 +2748,13 @@ function renderTimetable() {
     if (ttWeekOffset === 0) labelEl.textContent = '本周';
     else if (ttWeekOffset < 0) labelEl.textContent = Math.abs(ttWeekOffset) + ' 周前';
     else labelEl.textContent = ttWeekOffset + ' 周后';
+  }
+  // 动态更新"复制上周"按钮文字
+  var copyBtn = document.getElementById('tt-copy-btn');
+  if (copyBtn) {
+    if (ttWeekOffset === 0) copyBtn.textContent = '复制上周';
+    else if (ttWeekOffset === 1) copyBtn.textContent = '复制本周';
+    else copyBtn.textContent = '复制前一周';
   }
 
   var data = loadDB();
