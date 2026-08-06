@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.35';
+      var APP_VERSION = 'v4.0.36';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -1018,9 +1018,12 @@ function mergeLocalAndCloud(localData, cloudData) {
     if (!localRecordIds.has(cr.id)) mergedRecords.push(cr);
   });
 
-  // timetable：按 id 并集，本地优先
+  // timetable：按 id 并集，本地优先；已删除条目拒绝云端恢复
   var localTt = localData.timetable || [];
   var cloudTt = cloudData.timetable || [];
+  var deletedIds = localData._deletedTtIds || [];
+  var deletedSet = {};
+  deletedIds.forEach(function(id){ deletedSet[id] = true; });
   var localTtIds = new Set();
   var mergedTt = [];
   localTt.forEach(function(e){
@@ -1028,6 +1031,8 @@ function mergeLocalAndCloud(localData, cloudData) {
     mergedTt.push(e);
   });
   cloudTt.forEach(function(ce){
+    // 跳过本地已删除的条目（防止云端旧数据恢复）
+    if (deletedSet[ce.id]) return;
     if (!localTtIds.has(ce.id)) mergedTt.push(ce);
   });
 
@@ -1036,6 +1041,7 @@ function mergeLocalAndCloud(localData, cloudData) {
     records: mergedRecords,
     timetable: mergedTt,
     recentExternalNames: cloudData.recentExternalNames || localData.recentExternalNames || [],
+    _deletedTtIds: localData._deletedTtIds || cloudData._deletedTtIds || [],
     version: cloudData.version || localData.version
   };
 }
@@ -1132,8 +1138,14 @@ function cbPullAndMerge(opts) {
     var phone = getCurrentUser();
     if (phone) { try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(merged)); } catch(e){} }
     setLastCloudUpdatedAt(cloudTs);
-    // 合并后推送到云端，让另一台设备也能同步
-    cbPushData(CB_UID, merged, getCBExtra());
+    // 合并后推送到云端，让另一台设备也能同步；成功后清理删除追踪
+    cbPushData(CB_UID, merged, getCBExtra()).then(function(){
+      var d = loadDB();
+      if (d._deletedTtIds && d._deletedTtIds.length > 0) {
+        d._deletedTtIds = [];
+        saveDB(d);
+      }
+    });
     // 刷新 UI
     if (typeof renderHome === 'function') renderHome();
     if (typeof renderStudents === 'function') renderStudents();
@@ -2102,8 +2114,14 @@ function afterAuthSuccess(phone, isRegister) {
       try { localStorage.setItem('keshi_data_' + phone, JSON.stringify(merged)); } catch(e) {}
       syncCloudMetaToLocal(phone, cloudDoc);
       setLastCloudUpdatedAt(cloudDoc.updatedAt || Date.now());
-      // 推送合并结果到云端，保持一致
-      cbPushData(CB_UID, merged, getCBExtra());
+      // 推送合并结果到云端，保持一致；成功后清理删除追踪
+      cbPushData(CB_UID, merged, getCBExtra()).then(function(){
+        var d = loadDB();
+        if (d._deletedTtIds && d._deletedTtIds.length > 0) {
+          d._deletedTtIds = [];
+          saveDB(d);
+        }
+      });
       enterApp();
       showToast(isRegister ? '注册成功' : '已同步云端数据');
     } else {
@@ -3177,8 +3195,20 @@ function deleteTimetableEntry(entryId) {
   showConfirm('删除这节课程？', function() {
     var data = loadDB();
     data.timetable = (data.timetable || []).filter(function(e) { return e.id !== entryId; });
+    // 追踪已删除条目 ID，防止云端旧数据在下次合并时恢复
+    data._deletedTtIds = data._deletedTtIds || [];
+    if (data._deletedTtIds.indexOf(entryId) === -1) data._deletedTtIds.push(entryId);
     saveDB(data);
-    if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+    if (CB_UID) {
+      cbPushData(CB_UID, data, getCBExtra()).then(function(ok){
+        // 推送成功 → 云端已是正确状态，清理删除追踪
+        if (ok) {
+          var d = loadDB();
+          d._deletedTtIds = (d._deletedTtIds || []).filter(function(id){ return id !== entryId; });
+          saveDB(d);
+        }
+      });
+    }
     renderTimetable();
     showToast('已删除');
   });
@@ -3334,6 +3364,7 @@ function migrateDB() {
   });
   if (!data.timetable) { data.timetable = []; changed = true; }
   if (!data.recentExternalNames) { data.recentExternalNames = []; changed = true; }
+  if (!data._deletedTtIds) { data._deletedTtIds = []; changed = true; }
   if (changed) saveDB(data);
 }
 
