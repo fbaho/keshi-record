@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.39';
+      var APP_VERSION = 'v4.0.40';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -2871,7 +2871,15 @@ function openAddTimetableEntry() {
     var dateStr = toLocalDateString(d);
     html += '<button type="button" class="weekday-toggle' + (i === 0 ? ' active' : '') + '" data-date="' + dateStr + '" onclick="selectTtDay(this,\'' + dateStr + '\')">' + dayNames[i] + '<br><span style="font-size:11px;font-weight:400">' + (d.getMonth()+1) + '/' + d.getDate() + '</span></button>';
   }
+  // 保存滚动位置，防止渲染后回退到最左侧
+  var gridWrap = document.querySelector('#tt-weekdays .tt-grid-wrap');
+  var savedScrollLeft = gridWrap ? gridWrap.scrollLeft : 0;
+
   document.getElementById('tt-weekdays').innerHTML = html;
+
+  // 恢复滚动位置
+  gridWrap = document.querySelector('#tt-weekdays .tt-grid-wrap');
+  if (gridWrap && savedScrollLeft > 0) gridWrap.scrollLeft = savedScrollLeft;
   ttSelectedDay = weekDates[0] ? toLocalDateString(weekDates[0]) : '';
 
   // 渲染 app 学员列表
