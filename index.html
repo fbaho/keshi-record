@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.37';
+      var APP_VERSION = 'v4.0.38';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -3267,16 +3267,18 @@ function checkTimetableAutoDeduct() {
   var entries = data.timetable || [];
   var today = toLocalDateString(new Date());
   var pending = [];
+  console.log('[课表消课] 今天=', today, '课表总条目=', entries.length);
 
   // 找到今天及之前未消课的 app 学生的排课
   entries.forEach(function(e) {
-    if (e.isExternal || e.autoDeducted) return; // 外部学生或已消课跳过
-    if (e.date > today) return; // 未来的不处理
-    if (!e.studentId) return;
+    if (e.isExternal) { console.log('[课表消课] 跳过外部学生:', e.studentName, e.date, 'isExternal=true'); return; }
+    if (e.autoDeducted) { console.log('[课表消课] 跳过已消课:', e.studentName, e.date, 'autoDeducted=true'); return; }
+    if (e.date > today) { console.log('[课表消课] 跳过未来日期:', e.studentName, e.date, '>', today); return; }
+    if (!e.studentId) { console.log('[课表消课] 跳过无studentId:', e.studentName, e.date); return; }
 
     var s = data.students.find(function(st) { return st.id === e.studentId; });
-    if (!s) return;
-    if (s.remainingHours < e.hours) return; // 课时不足
+    if (!s) { console.log('[课表消课] 跳过未找到学员:', e.studentName, 'studentId=', e.studentId, '学员数=', data.students.length); return; }
+    if (s.remainingHours < e.hours) { console.log('[课表消课] 跳过课时不足:', e.studentName, '剩余', s.remainingHours, '<', e.hours, '节'); return; }
 
     // 检查是否已有该日期的消课记录
     var hasRecord = data.records.some(function(r) {
@@ -3284,10 +3286,12 @@ function checkTimetableAutoDeduct() {
     });
     if (hasRecord) {
       // 已有记录，标记为已消课
+      console.log('[课表消课] 已有记录，标记autoDeducted:', e.studentName, e.date);
       e.autoDeducted = true;
       return;
     }
 
+    console.log('[课表消课] ✓ 待消课:', e.studentName, e.date, e.hours + '节');
     pending.push({
       entry: e,
       student: s
@@ -3323,6 +3327,7 @@ function checkTimetableAutoDeduct() {
 
   // 记录哪些 entry 对应这次自动消课，确认后标记
   window._ttPendingEntries = pending.map(function(item) { return item.entry; });
+  console.log('[课表消课] 待消课总数=' + pendingAutoDeductions.length, pendingAutoDeductions.map(function(p){ return p.student.name + ':' + p.dates.join(','); }));
 }
 
 // ===== 数据迁移（兼容旧数据） =====
