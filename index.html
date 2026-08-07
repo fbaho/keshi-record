@@ -34,7 +34,7 @@
   <script>
     // ===== 紧急救援模式 + 版本自检 =====
     (function(){
-      var APP_VERSION = 'v4.0.38';
+      var APP_VERSION = 'v4.0.39';
       try {
         var cached = localStorage.getItem('__app_version');
         if (!cached) {
@@ -2486,7 +2486,14 @@ function showAutoDeductModal() {
   const listEl = document.getElementById('auto-deduct-list');
   const dayNames = {1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
 
-  listEl.innerHTML = pendingAutoDeductions.map((item, idx) => {
+  // 如果有修复的排课，显示提示
+  let fixedNotice = '';
+  if (window._ttFixedCount > 0) {
+    fixedNotice = '<div style="background:var(--bg-grouped);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--warning)">' +
+      '⚠ 已自动修复 ' + window._ttFixedCount + ' 条排课的学员关联，如果仍有问题请检查课表</div>';
+  }
+
+  listEl.innerHTML = fixedNotice + pendingAutoDeductions.map((item, idx) => {
     const s = item.student;
     const dates = item.dates;
     const totalHours = dates.length * item.hoursPerSession;
@@ -3267,6 +3274,7 @@ function checkTimetableAutoDeduct() {
   var entries = data.timetable || [];
   var today = toLocalDateString(new Date());
   var pending = [];
+  var fixedCount = 0; // 统计修复了多少条孤儿排课
   console.log('[课表消课] 今天=', today, '课表总条目=', entries.length);
 
   // 找到今天及之前未消课的 app 学生的排课
@@ -3277,10 +3285,19 @@ function checkTimetableAutoDeduct() {
     if (!e.studentId) { console.log('[课表消课] 跳过无studentId:', e.studentName, e.date); return; }
 
     var s = data.students.find(function(st) { return st.id === e.studentId; });
+    // ===== 关键修复：studentId 不匹配时，用名字尝试匹配 =====
+    if (!s && e.studentName) {
+      s = data.students.find(function(st) { return st.name === e.studentName; });
+      if (s) {
+        console.log('[课表消课] 自动修复studentId:', e.studentName, e.studentId, '→', s.id);
+        e.studentId = s.id; // 修复排课条目的 studentId
+        fixedCount++;
+      }
+    }
     if (!s) { console.log('[课表消课] 跳过未找到学员:', e.studentName, 'studentId=', e.studentId, '学员数=', data.students.length); return; }
     if (s.remainingHours < e.hours) { console.log('[课表消课] 跳过课时不足:', e.studentName, '剩余', s.remainingHours, '<', e.hours, '节'); return; }
 
-    // 检查是否已有该日期的消课记录
+    // 检查是否已有该日期的消课记录（用修复后的 studentId 检查）
     var hasRecord = data.records.some(function(r) {
       return r.studentId === e.studentId && r.date === e.date && r.type !== 'adjust';
     });
@@ -3297,6 +3314,13 @@ function checkTimetableAutoDeduct() {
       student: s
     });
   });
+
+  // 如果有修复，保存数据
+  if (fixedCount > 0) {
+    console.log('[课表消课] 共修复', fixedCount, '条排课studentId');
+    saveDB(data);
+    if (CB_UID) cbPushData(CB_UID, data, getCBExtra());
+  }
 
   if (pending.length === 0) {
     // 即使没有待消课，也要保存 autoDeducted 更新
@@ -3328,6 +3352,8 @@ function checkTimetableAutoDeduct() {
   // 记录哪些 entry 对应这次自动消课，确认后标记
   window._ttPendingEntries = pending.map(function(item) { return item.entry; });
   console.log('[课表消课] 待消课总数=' + pendingAutoDeductions.length, pendingAutoDeductions.map(function(p){ return p.student.name + ':' + p.dates.join(','); }));
+  // 传递修复数量给弹窗
+  window._ttFixedCount = fixedCount;
 }
 
 // ===== 数据迁移（兼容旧数据） =====
